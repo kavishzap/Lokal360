@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslate } from "@/i18n/use-translate";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ export function FormModal({
   children: React.ReactNode;
   className?: string;
 }) {
+  const { t } = useTranslate();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -33,8 +35,8 @@ export function FormModal({
         )}
       >
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          {description ? <DialogDescription>{description}</DialogDescription> : null}
+          <DialogTitle>{t(title)}</DialogTitle>
+          {description ? <DialogDescription>{t(description)}</DialogDescription> : null}
         </DialogHeader>
         {children}
       </DialogContent>
@@ -51,9 +53,10 @@ export function Field({
   error?: string;
   children: React.ReactNode;
 }) {
+  const { t } = useTranslate();
   return (
     <div className="space-y-1.5">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
+      <label className="text-sm font-medium text-slate-700">{t(label)}</label>
       {children}
       {error ? <p className="text-xs text-red-600">{error}</p> : null}
     </div>

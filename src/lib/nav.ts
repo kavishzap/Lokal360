@@ -21,6 +21,7 @@ import {
   Scale,
   Settings,
   ShoppingBasket,
+  Sparkles,
   Tags,
   TrendingUp,
   Truck,
@@ -92,6 +93,12 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/dashboard/reports/sales", label: "Sales report", icon: TrendingUp },
       { href: "/dashboard/reports/pnl", label: "P&L", icon: Calculator },
     ],
+  },
+  {
+    id: "ai-analytics",
+    label: "AI Analytics",
+    icon: Sparkles,
+    href: "/dashboard/ai-analytics",
   },
   {
     id: "payroll",
@@ -271,12 +278,28 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
         { label: "P&L" },
       ],
     },
+    "/dashboard/ai-analytics": {
+      title: "AI Analytics",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "AI Analytics" },
+      ],
+    },
     "/dashboard/payroll/employees": {
       title: "Employees",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
         { label: "Payroll" },
         { label: "Employees" },
+      ],
+    },
+    "/dashboard/payroll/employees/new": {
+      title: "Add employee",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Payroll" },
+        { label: "Employees", href: "/dashboard/payroll/employees" },
+        { label: "Add employee" },
       ],
     },
     "/dashboard/payroll/leave": {
@@ -316,3 +339,20 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       crumbs: [{ label: "Dashboard", href: "/dashboard" }, { label: "Settings" }],
     },
   };
+
+export function pageMeta(pathname: string) {
+  const known = PAGE_META[pathname];
+  if (known) return known;
+  if (/^\/dashboard\/payroll\/employees\/[^/]+$/.test(pathname)) {
+    return {
+      title: "Edit employee",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Payroll" },
+        { label: "Employees", href: "/dashboard/payroll/employees" },
+        { label: "Edit employee" },
+      ],
+    };
+  }
+  return { title: "Back Office", crumbs: [{ label: "Dashboard" }] };
+}

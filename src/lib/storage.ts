@@ -8,6 +8,7 @@ import {
   makeUnits,
 } from "@/data/seed";
 import { makeHolidays, makeSamplePayroll } from "@/data/payroll-seed";
+import { defaultCompany } from "@/lib/company";
 import { defaultPayrollPolicy } from "@/lib/payroll";
 import type { AppData, Ingredient, MeasurementUnit } from "@/types";
 
@@ -35,6 +36,7 @@ export function emptyData(): AppData {
     attendance: [],
     payslips: [],
     payrollPolicy: defaultPayrollPolicy(),
+    company: defaultCompany(),
   };
 }
 
@@ -96,6 +98,9 @@ function migrate(parsed: Partial<AppData> & { ingredients?: LegacyIngredient[] }
     attendance: parsed.attendance ?? payroll.attendance,
     payslips: parsed.payslips ?? payroll.payslips,
     payrollPolicy: parsed.payrollPolicy ?? payroll.payrollPolicy,
+    company: parsed.company?.name?.trim()
+      ? { ...defaultCompany(), ...parsed.company, logo: parsed.company.logo ?? null }
+      : defaultCompany(),
   };
 }
 

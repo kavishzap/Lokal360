@@ -1,4 +1,5 @@
 import { makeSamplePayroll } from "@/data/payroll-seed";
+import { defaultCompany } from "@/lib/company";
 import { placeholderImage } from "@/lib/placeholder";
 import type {
   Account,
@@ -1100,5 +1101,6 @@ export function createSeedData(): AppData {
     orders,
     ...accounting,
     ...payroll,
+    company: defaultCompany(),
   };
 }

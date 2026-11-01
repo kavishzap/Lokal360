@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Pencil, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
-import { EmployeeForm } from "@/components/payroll/employee-form";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { DataTable, type DataTableColumn } from "@/components/shared/data-table";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -26,17 +26,15 @@ import { useAppStore } from "@/store/app-store";
 import type { Employee } from "@/types";
 
 export default function EmployeesPage() {
+  const router = useRouter();
   const employees = useAppStore((state) => state.employees);
   const deleteEmployee = useAppStore((state) => state.deleteEmployee);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<string | null>("all");
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Employee | null>(null);
   const [deleting, setDeleting] = useState<Employee | null>(null);
 
   useCreateRequest("employee", () => {
-    setEditing(null);
-    setOpen(true);
+    router.push("/dashboard/payroll/employees/new");
   });
 
   const filtered = useMemo(() => {
@@ -60,12 +58,16 @@ export default function EmployeesPage() {
     {
       header: "Employee",
       cell: (employee) => (
-        <div>
-          <p className="font-medium">{employeeName(employee)}</p>
+        <button
+          type="button"
+          className="text-left"
+          onClick={() => router.push(`/dashboard/payroll/employees/${employee.id}`)}
+        >
+          <p className="font-medium text-slate-900">{employeeName(employee)}</p>
           <p className="text-xs text-slate-500">
             {employee.employeeNumber} · {employee.nid || "No NIC"}
           </p>
-        </div>
+        </button>
       ),
     },
     {
@@ -93,10 +95,8 @@ export default function EmployeesPage() {
           <Button
             variant="ghost"
             size="icon-sm"
-            onClick={() => {
-              setEditing(employee);
-              setOpen(true);
-            }}
+            aria-label={`Edit ${employeeName(employee)}`}
+            onClick={() => router.push(`/dashboard/payroll/employees/${employee.id}`)}
           >
             <Pencil />
           </Button>
@@ -114,10 +114,7 @@ export default function EmployeesPage() {
         title="Employees"
         description="Personal details, job type, start date and pay-role settings for Mauritian CSG, NSF, PRGF and PAYE."
         actionLabel="Add employee"
-        onAction={() => {
-          setEditing(null);
-          setOpen(true);
-        }}
+        onAction={() => router.push("/dashboard/payroll/employees/new")}
       />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -150,22 +147,11 @@ export default function EmployeesPage() {
             title="No employees"
             description="Add the first team member to start leave, attendance and payslips."
             actionLabel="Add employee"
-            onAction={() => {
-              setEditing(null);
-              setOpen(true);
-            }}
+            onAction={() => router.push("/dashboard/payroll/employees/new")}
           />
         }
       />
 
-      <EmployeeForm
-        open={open}
-        onOpenChange={(next) => {
-          setOpen(next);
-          if (!next) setEditing(null);
-        }}
-        employee={editing}
-      />
       <ConfirmDialog
         open={Boolean(deleting)}
         onOpenChange={(next) => {

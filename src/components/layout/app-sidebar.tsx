@@ -7,9 +7,12 @@ import { ChevronDown, LogOut, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useTranslate } from "@/i18n/use-translate";
+import { companyInitials } from "@/lib/company";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { NAV_SECTIONS } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
 import { useUiStore } from "@/store/ui-store";
 
@@ -25,12 +28,10 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
   const logout = useAuthStore((state) => state.logout);
   const session = useAuthStore((state) => state.session);
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    restaurant: true,
-    accounting: true,
-    reports: true,
-    payroll: true,
-  });
+  const company = useAppStore((state) => state.company);
+  const brand = company?.name?.trim() || APP_NAME;
+  const { t } = useTranslate();
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const handleLogout = () => {
     logout();
@@ -41,13 +42,18 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full flex-col bg-[#0F172A] text-slate-200">
       <div className={cn("flex items-center gap-3 border-b border-white/10 px-4 py-4", collapsed && "justify-center px-2")}>
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 font-semibold text-white">
-          B42
+        <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-600 text-xs font-semibold text-white">
+          {company?.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={company.logo} alt="" className="size-full object-cover" />
+          ) : (
+            companyInitials(brand)
+          )}
         </div>
         {!collapsed ? (
           <div className="min-w-0 flex-1">
-            <p className="truncate font-semibold text-white">{APP_NAME}</p>
-            <p className="truncate text-xs text-slate-400">{APP_TAGLINE}</p>
+            <p className="truncate font-semibold text-white">{brand}</p>
+            <p className="truncate text-xs text-slate-400">{t(APP_TAGLINE)}</p>
           </div>
         ) : null}
         <Button
@@ -69,7 +75,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <Link
                   key={section.id}
                   href={section.href ?? "#"}
-                  title={collapsed ? section.label : undefined}
+                  title={collapsed ? t(section.label) : undefined}
                   onClick={onNavigate}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition",
@@ -80,7 +86,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   )}
                 >
                   <section.icon className="size-4 shrink-0" />
-                  {!collapsed ? <span>{section.label}</span> : null}
+                  {!collapsed ? <span>{t(section.label)}</span> : null}
                 </Link>
               );
             }
@@ -94,7 +100,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                       <Link
                         key={child.href}
                         href={child.href}
-                        title={child.label}
+                        title={t(child.label)}
                         onClick={onNavigate}
                         className={cn(
                           "flex items-center justify-center rounded-lg px-2 py-2 text-sm",
@@ -109,8 +115,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               );
             }
 
-            const childActive = section.children.some((child) => isActivePath(pathname, child.href));
-            const open = openSections[section.id] ?? childActive;
+            const open = openSections[section.id] ?? false;
 
             return (
               <Collapsible
@@ -121,7 +126,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                 <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-white/10 hover:text-white">
                   <span className="flex items-center gap-3">
                     <section.icon className="size-4" />
-                    {section.label}
+                    {t(section.label)}
                   </span>
                   <ChevronDown className={cn("size-4 transition", open && "rotate-180")} />
                 </CollapsibleTrigger>
@@ -142,7 +147,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
                           )}
                         >
                           <child.icon className="size-4" />
-                          {child.label}
+                          {t(child.label)}
                         </Link>
                       );
                     })}
@@ -158,7 +163,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
         {!collapsed && session ? (
           <div className="mb-3 rounded-lg bg-white/5 px-3 py-2">
             <p className="truncate text-sm font-medium text-white">{session.name}</p>
-            <p className="truncate text-xs text-slate-400">{session.role}</p>
+            <p className="truncate text-xs text-slate-400">{t(session.role)}</p>
           </div>
         ) : null}
         <Button
@@ -170,7 +175,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
           onClick={handleLogout}
         >
           <LogOut />
-          {!collapsed ? "Logout" : null}
+          {!collapsed ? t("Logout") : null}
         </Button>
       </div>
     </div>

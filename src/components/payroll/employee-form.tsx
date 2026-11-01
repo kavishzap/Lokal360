@@ -1,11 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Field, FormModal } from "@/components/shared/form-modal";
+import { Field } from "@/components/shared/form-modal";
+import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { JOB_TYPES } from "@/lib/payroll";
+import { employeeName, JOB_TYPES } from "@/lib/payroll";
 import { useAppStore } from "@/store/app-store";
 import type { Employee } from "@/types";
 
@@ -79,15 +81,10 @@ function toValues(employee?: Employee | null): Values {
   };
 }
 
-export function EmployeeForm({
-  open,
-  onOpenChange,
-  employee,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  employee?: Employee | null;
-}) {
+const LIST_PATH = "/dashboard/payroll/employees";
+
+export function EmployeeForm({ employee }: { employee?: Employee | null }) {
+  const router = useRouter();
   const createEmployee = useAppStore((state) => state.createEmployee);
   const updateEmployee = useAppStore((state) => state.updateEmployee);
   const form = useForm<Values>({
@@ -96,9 +93,8 @@ export function EmployeeForm({
   });
 
   useEffect(() => {
-    if (!open) return;
     form.reset(toValues(employee));
-  }, [open, employee, form]);
+  }, [employee, form]);
 
   const onSubmit = (values: Values) => {
     const payload = {
@@ -134,179 +130,184 @@ export function EmployeeForm({
       return;
     }
     toast.success(employee ? "Employee updated" : "Employee added");
-    onOpenChange(false);
+    router.push(LIST_PATH);
   };
 
   return (
-    <FormModal
-      open={open}
-      onOpenChange={onOpenChange}
-      title={employee ? "Edit employee" : "Add employee"}
-      description="Personal, job and pay-role details used for CSG, NSF, PRGF, PAYE and leave under Mauritian law."
-      className="sm:max-w-2xl"
-    >
-      <form className="space-y-5" onSubmit={form.handleSubmit(onSubmit)}>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Personal</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="First name" error={form.formState.errors.firstName?.message}>
-            <Input {...form.register("firstName")} />
-          </Field>
-          <Field label="Last name" error={form.formState.errors.lastName?.message}>
-            <Input {...form.register("lastName")} />
-          </Field>
-          <Field label="NIC / NID">
-            <Input {...form.register("nid")} placeholder="National identity number" />
-          </Field>
-          <Field label="Date of birth">
-            <Input type="date" {...form.register("dateOfBirth")} />
-          </Field>
-          <Field label="Gender">
-            <Controller
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="female">Female</SelectItem>
-                    <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-          <Field label="Marital status">
-            <Controller
-              control={form.control}
-              name="maritalStatus"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="single">Single</SelectItem>
-                    <SelectItem value="married">Married</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-          <Field label="Nationality">
-            <Input {...form.register("nationality")} />
-          </Field>
-          <Field label="Phone">
-            <Input {...form.register("phone")} />
-          </Field>
-          <Field label="Email" error={form.formState.errors.email?.message}>
-            <Input type="email" {...form.register("email")} />
-          </Field>
-          <Field label="Address">
-            <Input {...form.register("address")} />
-          </Field>
-        </div>
+    <div className="mx-auto max-w-3xl">
+      <PageHeader
+        title={employee ? employeeName(employee) : "Add employee"}
+        description="Personal, job and pay details used for CSG, NSF, PRGF, PAYE and leave."
+      />
+      <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
+        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-semibold text-slate-900">Personal</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="First name" error={form.formState.errors.firstName?.message}>
+              <Input {...form.register("firstName")} />
+            </Field>
+            <Field label="Last name" error={form.formState.errors.lastName?.message}>
+              <Input {...form.register("lastName")} />
+            </Field>
+            <Field label="NIC / NID">
+              <Input {...form.register("nid")} placeholder="National identity number" />
+            </Field>
+            <Field label="Date of birth">
+              <Input type="date" {...form.register("dateOfBirth")} />
+            </Field>
+            <Field label="Gender">
+              <Controller
+                control={form.control}
+                name="gender"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Marital status">
+              <Controller
+                control={form.control}
+                name="maritalStatus"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="single">Single</SelectItem>
+                      <SelectItem value="married">Married</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Nationality">
+              <Input {...form.register("nationality")} />
+            </Field>
+            <Field label="Phone">
+              <Input {...form.register("phone")} />
+            </Field>
+            <Field label="Email">
+              <Input type="email" {...form.register("email")} />
+            </Field>
+            <Field label="Address">
+              <Input {...form.register("address")} />
+            </Field>
+          </div>
+        </section>
 
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Job</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Job title" error={form.formState.errors.jobTitle?.message}>
-            <Input {...form.register("jobTitle")} placeholder="Head chef" />
-          </Field>
-          <Field label="Department">
-            <Input {...form.register("department")} placeholder="Kitchen" />
-          </Field>
-          <Field label="Job type">
+        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-semibold text-slate-900">Job</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Job title" error={form.formState.errors.jobTitle?.message}>
+              <Input {...form.register("jobTitle")} placeholder="Head chef" />
+            </Field>
+            <Field label="Department">
+              <Input {...form.register("department")} placeholder="Kitchen" />
+            </Field>
+            <Field label="Job type">
+              <Controller
+                control={form.control}
+                name="jobType"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {JOB_TYPES.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Start date" error={form.formState.errors.startDate?.message}>
+              <Input type="date" {...form.register("startDate")} />
+            </Field>
+            <Field label="End date">
+              <Input type="date" {...form.register("endDate")} />
+            </Field>
+            <Field label="Work days / week">
+              <Controller
+                control={form.control}
+                name="workDaysPerWeek"
+                render={({ field }) => (
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 days</SelectItem>
+                      <SelectItem value="6">6 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </Field>
+            <Field label="Hours / week" error={form.formState.errors.hoursPerWeek?.message}>
+              <Input type="number" min={1} step={0.5} {...form.register("hoursPerWeek", { valueAsNumber: true })} />
+            </Field>
+          </div>
+          <label className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+            Active on payroll
             <Controller
               control={form.control}
-              name="jobType"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JOB_TYPES.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              name="isActive"
+              render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
             />
-          </Field>
-          <Field label="Start date" error={form.formState.errors.startDate?.message}>
-            <Input type="date" {...form.register("startDate")} />
-          </Field>
-          <Field label="End date">
-            <Input type="date" {...form.register("endDate")} />
-          </Field>
-          <Field label="Work days / week">
-            <Controller
-              control={form.control}
-              name="workDaysPerWeek"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5 days</SelectItem>
-                    <SelectItem value="6">6 days</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </Field>
-          <Field label="Hours / week" error={form.formState.errors.hoursPerWeek?.message}>
-            <Input type="number" min={1} step={0.5} {...form.register("hoursPerWeek", { valueAsNumber: true })} />
-          </Field>
-        </div>
-        <label className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-          Active on payroll
-          <Controller
-            control={form.control}
-            name="isActive"
-            render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
-          />
-        </label>
+          </label>
+        </section>
 
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pay role</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Basic salary (MUR / month)" error={form.formState.errors.basicSalary?.message}>
-            <Input type="number" min={0} step={0.01} {...form.register("basicSalary", { valueAsNumber: true })} />
+        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-semibold text-slate-900">Pay</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Basic salary (MUR / month)" error={form.formState.errors.basicSalary?.message}>
+              <Input type="number" min={0} step={0.01} {...form.register("basicSalary", { valueAsNumber: true })} />
+            </Field>
+            <Field label="EDF relief (annual MUR)">
+              <Input type="number" min={0} step={1} {...form.register("edfReliefAnnual", { valueAsNumber: true })} />
+            </Field>
+            <Field label="Bank">
+              <Input {...form.register("bankName")} placeholder="MCB" />
+            </Field>
+            <Field label="Account number">
+              <Input {...form.register("bankAccount")} />
+            </Field>
+          </div>
+          <label className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+            PRGF eligible (citizens with basic under Rs 200,000)
+            <Controller
+              control={form.control}
+              name="prgfEligible"
+              render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
+            />
+          </label>
+          <Field label="Notes">
+            <Textarea rows={3} {...form.register("notes")} />
           </Field>
-          <Field label="EDF relief (annual MUR)">
-            <Input type="number" min={0} step={1} {...form.register("edfReliefAnnual", { valueAsNumber: true })} />
-          </Field>
-          <Field label="Bank">
-            <Input {...form.register("bankName")} placeholder="MCB" />
-          </Field>
-          <Field label="Account number">
-            <Input {...form.register("bankAccount")} />
-          </Field>
-        </div>
-        <label className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
-          PRGF eligible (citizens with basic under Rs 200,000)
-          <Controller
-            control={form.control}
-            name="prgfEligible"
-            render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
-          />
-        </label>
-        <Field label="Notes">
-          <Textarea rows={2} {...form.register("notes")} />
-        </Field>
+        </section>
+
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button type="button" variant="outline" onClick={() => router.push(LIST_PATH)}>
             Cancel
           </Button>
           <Button type="submit">{employee ? "Save employee" : "Add employee"}</Button>
         </div>
       </form>
-    </FormModal>
+    </div>
   );
 }

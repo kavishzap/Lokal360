@@ -9,6 +9,7 @@ import {
   validateJournalLines,
 } from "@/lib/accounting";
 import { pendingDepreciation } from "@/lib/assets";
+import { defaultCompany } from "@/lib/company";
 import { buildPayslip, defaultPayrollPolicy, leaveDaysInRange } from "@/lib/payroll";
 import { createId, nowIso } from "@/lib/format";
 import { nextOrderNumber } from "@/lib/orders";
@@ -22,6 +23,7 @@ import type {
   AssetFunding,
   AttendanceRecord,
   AttendanceStatus,
+  CompanyProfile,
   Employee,
   Expense,
   FixedAsset,
@@ -199,6 +201,7 @@ interface AppState extends AppData {
   generatePayslips: (period: string, employeeId?: string) => ActionResult;
   deletePayslip: (id: string) => ActionResult;
   updatePayrollPolicy: (input: PayrollPolicy) => ActionResult;
+  updateCompany: (input: CompanyProfile) => ActionResult;
   addHoliday: (date: string, name: string) => ActionResult;
   deleteHoliday: (id: string) => ActionResult;
   postPurchaseLineToInventory: (
@@ -234,6 +237,7 @@ function snapshot(state: AppState): AppData {
     attendance: state.attendance ?? [],
     payslips: state.payslips ?? [],
     payrollPolicy: state.payrollPolicy ?? defaultPayrollPolicy(),
+    company: state.company ?? defaultCompany(),
   };
 }
 
@@ -1469,6 +1473,37 @@ export const useAppStore = create<AppState>((set, get) => ({
   updatePayrollPolicy: (input) => {
     const state = get();
     const next = { ...snapshot(state), payrollPolicy: input };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  updateCompany: (input) => {
+    const name = input.name.trim();
+    if (!name) return { ok: false, error: "Company name is required." };
+    const email = input.email.trim();
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { ok: false, error: "Enter a valid email address." };
+    }
+    if (input.logo && !input.logo.startsWith("data:image/")) {
+      return { ok: false, error: "Logo must be an image." };
+    }
+    if (input.logo && input.logo.length > 400_000) {
+      return { ok: false, error: "Logo is too large. Use a smaller image." };
+    }
+    const company: CompanyProfile = {
+      name,
+      legalName: input.legalName.trim(),
+      brn: input.brn.trim(),
+      vatNumber: input.vatNumber.trim(),
+      tan: input.tan.trim(),
+      address: input.address.trim(),
+      city: input.city.trim(),
+      phone: input.phone.trim(),
+      email,
+      website: input.website.trim(),
+      logo: input.logo,
+    };
+    const next = { ...snapshot(get()), company };
     persist(next);
     set(next);
     return { ok: true };

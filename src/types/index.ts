@@ -358,6 +358,20 @@ export interface PayrollPolicy {
   notes: string;
 }
 
+export interface CompanyProfile {
+  name: string;
+  legalName: string;
+  brn: string;
+  vatNumber: string;
+  tan: string;
+  address: string;
+  city: string;
+  phone: string;
+  email: string;
+  website: string;
+  logo: string | null;
+}
+
 export interface AppData {
   zones: Zone[];
   tables: RestaurantTable[];
@@ -379,6 +393,7 @@ export interface AppData {
   attendance: AttendanceRecord[];
   payslips: Payslip[];
   payrollPolicy: PayrollPolicy;
+  company: CompanyProfile;
 }
 
 export interface SessionUser {
