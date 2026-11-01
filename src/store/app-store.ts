@@ -1,0 +1,1770 @@
+import { create } from "zustand";
+import {
+  accountByCode,
+  expenseTotal,
+  lineAmount,
+  nextDocumentNumber,
+  purchaseTotal,
+  SYSTEM_ACCOUNT_CODES,
+  validateJournalLines,
+} from "@/lib/accounting";
+import { pendingDepreciation } from "@/lib/assets";
+import { buildPayslip, defaultPayrollPolicy, leaveDaysInRange } from "@/lib/payroll";
+import { createId, nowIso } from "@/lib/format";
+import { nextOrderNumber } from "@/lib/orders";
+import { emptyData, loadAppData, resetAppData, saveAppData } from "@/lib/storage";
+import type {
+  Account,
+  AccountType,
+  ActionResult,
+  AppData,
+  AssetCategory,
+  AssetFunding,
+  AttendanceRecord,
+  AttendanceStatus,
+  Employee,
+  Expense,
+  FixedAsset,
+  LeaveRequest,
+  LeaveStatus,
+  LeaveType,
+  PayrollPolicy,
+  Ingredient,
+  InventoryItem,
+  InventoryTransaction,
+  InventoryTransactionType,
+  JournalEntry,
+  JournalLine,
+  MenuCategory,
+  MenuItem,
+  MeasurementUnit,
+  MenuItemIngredient,
+  Order,
+  OrderItem,
+  OrderStatus,
+  Purchase,
+  PurchasePayment,
+  RestaurantTable,
+  Zone,
+} from "@/types";
+
+type ZoneInput = Pick<Zone, "name" | "description" | "isActive">;
+type TableInput = Pick<RestaurantTable, "name" | "zoneId" | "capacity" | "isActive">;
+type CategoryInput = Pick<
+  MenuCategory,
+  "name" | "description" | "image" | "displayOrder" | "isActive"
+>;
+type UnitInput = Pick<MeasurementUnit, "name" | "abbreviation" | "isActive">;
+type IngredientInput = Pick<Ingredient, "name" | "description" | "unitId" | "isActive">;
+type MenuItemInput = Omit<MenuItem, "id" | "createdAt" | "updatedAt">;
+type OrderInput = {
+  tableId: string;
+  status: OrderStatus;
+  notes: string;
+  items: Omit<OrderItem, "id">[];
+};
+type InventorySetupInput = {
+  ingredientId: string;
+  currentStock: number;
+  minimumStock: number;
+  costPerUnit: number;
+};
+type AccountInput = Pick<Account, "code" | "name" | "type" | "isCash" | "isActive">;
+type JournalInput = {
+  date: string;
+  description: string;
+  lines: Omit<JournalLine, "id">[];
+};
+type PurchaseLineInput = {
+  description: string;
+  ingredientId: string | null;
+  quantity: number;
+  unitCost: number;
+  addToInventory: boolean;
+};
+type PurchaseInput = {
+  supplier: string;
+  invoiceNumber: string;
+  date: string;
+  payment: PurchasePayment;
+  notes: string;
+  lines: PurchaseLineInput[];
+};
+type ExpenseInput = {
+  payee: string;
+  reference: string;
+  date: string;
+  payment: PurchasePayment;
+  notes: string;
+  lines: { description: string; accountId: string; amount: number }[];
+};
+type AssetInput = {
+  name: string;
+  category: AssetCategory;
+  acquiredOn: string;
+  cost: number;
+  funding: AssetFunding;
+  depreciates: boolean;
+  usefulLifeYears: number;
+  residualValue: number;
+  notes: string;
+};
+type EmployeeInput = Omit<Employee, "id" | "employeeNumber" | "createdAt" | "updatedAt">;
+type LeaveInput = {
+  employeeId: string;
+  type: LeaveType;
+  from: string;
+  to: string;
+  reason: string;
+};
+type AttendanceInput = {
+  employeeId: string;
+  date: string;
+  status: AttendanceStatus;
+  clockIn: string;
+  clockOut: string;
+  hoursWorked: number;
+  overtimeHours: number;
+  publicHolidayHours: number;
+  notes: string;
+};
+
+interface AppState extends AppData {
+  hydrated: boolean;
+  hydrate: () => void;
+  resetDemo: () => void;
+  createZone: (input: ZoneInput) => ActionResult;
+  updateZone: (id: string, input: ZoneInput) => ActionResult;
+  deleteZone: (id: string) => ActionResult;
+  createTable: (input: TableInput) => ActionResult;
+  updateTable: (id: string, input: TableInput) => ActionResult;
+  deleteTable: (id: string) => ActionResult;
+  createCategory: (input: CategoryInput) => ActionResult;
+  updateCategory: (id: string, input: CategoryInput) => ActionResult;
+  deleteCategory: (id: string) => ActionResult;
+  reorderCategory: (id: string, direction: "up" | "down") => ActionResult;
+  createUnit: (input: UnitInput) => ActionResult;
+  updateUnit: (id: string, input: UnitInput) => ActionResult;
+  deleteUnit: (id: string) => ActionResult;
+  createIngredient: (input: IngredientInput) => ActionResult;
+  updateIngredient: (id: string, input: IngredientInput) => ActionResult;
+  deleteIngredient: (id: string) => ActionResult;
+  createMenuItem: (input: MenuItemInput) => ActionResult;
+  updateMenuItem: (id: string, input: MenuItemInput) => ActionResult;
+  deleteMenuItem: (id: string) => ActionResult;
+  toggleMenuAvailability: (id: string) => ActionResult;
+  setupInventory: (input: InventorySetupInput) => ActionResult;
+  updateInventoryMeta: (
+    id: string,
+    input: Pick<InventoryItem, "minimumStock" | "costPerUnit">
+  ) => ActionResult;
+  addStock: (inventoryId: string, quantity: number, reason: string, date?: string) => ActionResult;
+  removeStock: (
+    inventoryId: string,
+    quantity: number,
+    reason: string,
+    date?: string
+  ) => ActionResult;
+  adjustStock: (
+    inventoryId: string,
+    newQuantity: number,
+    reason: string,
+    date?: string
+  ) => ActionResult;
+  deleteInventory: (id: string) => ActionResult;
+  createOrder: (input: OrderInput) => ActionResult;
+  updateOrder: (id: string, input: OrderInput) => ActionResult;
+  deleteOrder: (id: string) => ActionResult;
+  createAccount: (input: AccountInput) => ActionResult;
+  updateAccount: (id: string, input: AccountInput) => ActionResult;
+  deleteAccount: (id: string) => ActionResult;
+  createJournal: (input: JournalInput) => ActionResult;
+  deleteJournal: (id: string) => ActionResult;
+  createPurchase: (input: PurchaseInput) => ActionResult;
+  deletePurchase: (id: string) => ActionResult;
+  createExpense: (input: ExpenseInput) => ActionResult;
+  deleteExpense: (id: string) => ActionResult;
+  createAsset: (input: AssetInput) => ActionResult;
+  deleteAsset: (id: string) => ActionResult;
+  chargeAssetDepreciation: (id: string, asOfDate?: string) => ActionResult;
+  chargeAllDepreciation: (asOfDate?: string) => ActionResult;
+  createEmployee: (input: EmployeeInput) => ActionResult;
+  updateEmployee: (id: string, input: EmployeeInput) => ActionResult;
+  deleteEmployee: (id: string) => ActionResult;
+  createLeave: (input: LeaveInput) => ActionResult;
+  setLeaveStatus: (id: string, status: LeaveStatus) => ActionResult;
+  deleteLeave: (id: string) => ActionResult;
+  upsertAttendance: (input: AttendanceInput) => ActionResult;
+  deleteAttendance: (id: string) => ActionResult;
+  generatePayslips: (period: string, employeeId?: string) => ActionResult;
+  deletePayslip: (id: string) => ActionResult;
+  updatePayrollPolicy: (input: PayrollPolicy) => ActionResult;
+  addHoliday: (date: string, name: string) => ActionResult;
+  deleteHoliday: (id: string) => ActionResult;
+  postPurchaseLineToInventory: (
+    purchaseId: string,
+    lineId: string,
+    ingredientId?: string | null
+  ) => ActionResult;
+}
+
+function persist(data: AppData) {
+  saveAppData(data);
+}
+
+function snapshot(state: AppState): AppData {
+  return {
+    zones: state.zones,
+    tables: state.tables,
+    categories: state.categories,
+    units: state.units,
+    ingredients: state.ingredients,
+    menuItems: state.menuItems,
+    inventory: state.inventory,
+    transactions: state.transactions,
+    orders: state.orders,
+    accounts: state.accounts,
+    journalEntries: state.journalEntries,
+    purchases: state.purchases,
+    expenses: state.expenses ?? [],
+    assets: state.assets ?? [],
+    employees: state.employees ?? [],
+    holidays: state.holidays ?? [],
+    leaveRequests: state.leaveRequests ?? [],
+    attendance: state.attendance ?? [],
+    payslips: state.payslips ?? [],
+    payrollPolicy: state.payrollPolicy ?? defaultPayrollPolicy(),
+  };
+}
+
+function inactiveIngredientWarning(items: MenuItemIngredient[], ingredients: Ingredient[]) {
+  const inactive = items
+    .map((row) => ingredients.find((ingredient) => ingredient.id === row.ingredientId))
+    .filter((ingredient): ingredient is Ingredient => Boolean(ingredient && !ingredient.isActive));
+  if (inactive.length === 0) return undefined;
+  return `Saved with inactive ingredient${inactive.length > 1 ? "s" : ""}: ${inactive
+    .map((item) => item.name)
+    .join(", ")}`;
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  ...emptyData(),
+  hydrated: false,
+  hydrate: () => {
+    try {
+      set({ ...loadAppData(), hydrated: true });
+    } catch (error) {
+      console.error(error);
+      set({ ...emptyData(), hydrated: true });
+    }
+  },
+  resetDemo: () => {
+    set({ ...resetAppData(), hydrated: true });
+  },
+  createZone: (input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Zone name is required." };
+    const duplicate = state.zones.some(
+      (zone) => zone.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (duplicate) return { ok: false, error: "A zone with this name already exists." };
+    const zone: Zone = {
+      id: createId(),
+      name: input.name.trim(),
+      description: input.description.trim(),
+      isActive: input.isActive,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), zones: [zone, ...state.zones] };
+    persist(next);
+    set(next);
+    return { ok: true, id: zone.id };
+  },
+  updateZone: (id, input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Zone name is required." };
+    const duplicate = state.zones.some(
+      (zone) =>
+        zone.id !== id && zone.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (duplicate) return { ok: false, error: "A zone with this name already exists." };
+    const next = {
+      ...snapshot(state),
+      zones: state.zones.map((zone) =>
+        zone.id === id
+          ? {
+              ...zone,
+              name: input.name.trim(),
+              description: input.description.trim(),
+              isActive: input.isActive,
+              updatedAt: nowIso(),
+            }
+          : zone
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteZone: (id) => {
+    const state = get();
+    const assigned = state.tables.filter((table) => table.zoneId === id).length;
+    if (assigned > 0) {
+      return {
+        ok: false,
+        error: `This zone cannot be deleted because ${assigned} table${assigned === 1 ? " is" : "s are"} assigned to it. Reassign or delete those tables first.`,
+      };
+    }
+    const next = { ...snapshot(state), zones: state.zones.filter((zone) => zone.id !== id) };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createTable: (input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Table name is required." };
+    if (!input.zoneId) return { ok: false, error: "A zone is required." };
+    if (input.capacity < 1) return { ok: false, error: "Capacity must be at least 1." };
+    const duplicate = state.tables.some(
+      (table) =>
+        table.zoneId === input.zoneId &&
+        table.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (duplicate) {
+      return { ok: false, error: "A table with this name already exists in the selected zone." };
+    }
+    const table: RestaurantTable = {
+      id: createId(),
+      name: input.name.trim(),
+      zoneId: input.zoneId,
+      capacity: input.capacity,
+      isActive: input.isActive,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), tables: [table, ...state.tables] };
+    persist(next);
+    set(next);
+    return { ok: true, id: table.id };
+  },
+  updateTable: (id, input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Table name is required." };
+    if (!input.zoneId) return { ok: false, error: "A zone is required." };
+    if (input.capacity < 1) return { ok: false, error: "Capacity must be at least 1." };
+    const duplicate = state.tables.some(
+      (table) =>
+        table.id !== id &&
+        table.zoneId === input.zoneId &&
+        table.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (duplicate) {
+      return { ok: false, error: "A table with this name already exists in the selected zone." };
+    }
+    const next = {
+      ...snapshot(state),
+      tables: state.tables.map((table) =>
+        table.id === id
+          ? {
+              ...table,
+              name: input.name.trim(),
+              zoneId: input.zoneId,
+              capacity: input.capacity,
+              isActive: input.isActive,
+              updatedAt: nowIso(),
+            }
+          : table
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteTable: (id) => {
+    const state = get();
+    const linkedOrders = state.orders.filter((order) => order.tableId === id).length;
+    if (linkedOrders > 0) {
+      return {
+        ok: false,
+        error: `This table cannot be deleted because ${linkedOrders} order${linkedOrders === 1 ? " is" : "s are"} linked to it.`,
+      };
+    }
+    const next = { ...snapshot(state), tables: state.tables.filter((table) => table.id !== id) };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createCategory: (input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Category name is required." };
+    const category: MenuCategory = {
+      id: createId(),
+      name: input.name.trim(),
+      description: input.description.trim(),
+      image: input.image,
+      displayOrder: input.displayOrder || state.categories.length + 1,
+      isActive: input.isActive,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), categories: [...state.categories, category] };
+    persist(next);
+    set(next);
+    return { ok: true, id: category.id };
+  },
+  updateCategory: (id, input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Category name is required." };
+    const next = {
+      ...snapshot(state),
+      categories: state.categories.map((category) =>
+        category.id === id
+          ? {
+              ...category,
+              name: input.name.trim(),
+              description: input.description.trim(),
+              image: input.image,
+              displayOrder: input.displayOrder,
+              isActive: input.isActive,
+              updatedAt: nowIso(),
+            }
+          : category
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteCategory: (id) => {
+    const state = get();
+    const linked = state.menuItems.filter((item) => item.categoryId === id).length;
+    if (linked > 0) {
+      return {
+        ok: false,
+        error: `This category cannot be deleted because ${linked} menu item${linked === 1 ? " is" : "s are"} assigned to it.`,
+      };
+    }
+    const next = {
+      ...snapshot(state),
+      categories: state.categories.filter((category) => category.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  reorderCategory: (id, direction) => {
+    const state = get();
+    const ordered = [...state.categories].sort((a, b) => a.displayOrder - b.displayOrder);
+    const index = ordered.findIndex((category) => category.id === id);
+    if (index < 0) return { ok: false, error: "Category not found." };
+    const swapWith = direction === "up" ? index - 1 : index + 1;
+    if (swapWith < 0 || swapWith >= ordered.length) return { ok: true };
+    const current = ordered[index];
+    const other = ordered[swapWith];
+    const nextOrder = ordered.map((category) => {
+      if (category.id === current.id) return { ...category, displayOrder: other.displayOrder, updatedAt: nowIso() };
+      if (category.id === other.id) return { ...category, displayOrder: current.displayOrder, updatedAt: nowIso() };
+      return category;
+    });
+    const next = { ...snapshot(state), categories: nextOrder };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createUnit: (input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Unit name is required." };
+    if (!input.abbreviation.trim()) return { ok: false, error: "Abbreviation is required." };
+    const nameTaken = state.units.some(
+      (unit) => unit.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (nameTaken) return { ok: false, error: "A unit with this name already exists." };
+    const abbrTaken = state.units.some(
+      (unit) => unit.abbreviation.trim().toLowerCase() === input.abbreviation.trim().toLowerCase()
+    );
+    if (abbrTaken) return { ok: false, error: "A unit with this abbreviation already exists." };
+    const unit: MeasurementUnit = {
+      id: createId(),
+      name: input.name.trim(),
+      abbreviation: input.abbreviation.trim(),
+      isActive: input.isActive,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), units: [unit, ...state.units] };
+    persist(next);
+    set(next);
+    return { ok: true, id: unit.id };
+  },
+  updateUnit: (id, input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Unit name is required." };
+    if (!input.abbreviation.trim()) return { ok: false, error: "Abbreviation is required." };
+    const nameTaken = state.units.some(
+      (unit) =>
+        unit.id !== id && unit.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (nameTaken) return { ok: false, error: "A unit with this name already exists." };
+    const abbrTaken = state.units.some(
+      (unit) =>
+        unit.id !== id &&
+        unit.abbreviation.trim().toLowerCase() === input.abbreviation.trim().toLowerCase()
+    );
+    if (abbrTaken) return { ok: false, error: "A unit with this abbreviation already exists." };
+    const next = {
+      ...snapshot(state),
+      units: state.units.map((unit) =>
+        unit.id === id
+          ? {
+              ...unit,
+              name: input.name.trim(),
+              abbreviation: input.abbreviation.trim(),
+              isActive: input.isActive,
+              updatedAt: nowIso(),
+            }
+          : unit
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteUnit: (id) => {
+    const state = get();
+    const used = state.ingredients.some((ingredient) => ingredient.unitId === id);
+    if (used) {
+      return {
+        ok: false,
+        error: "This unit cannot be deleted because it is used by one or more ingredients.",
+      };
+    }
+    const next = { ...snapshot(state), units: state.units.filter((unit) => unit.id !== id) };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createIngredient: (input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Ingredient name is required." };
+    if (!input.unitId) return { ok: false, error: "A unit of measurement is required." };
+    const duplicate = state.ingredients.some(
+      (ingredient) => ingredient.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (duplicate) return { ok: false, error: "An ingredient with this name already exists." };
+    const ingredient: Ingredient = {
+      id: createId(),
+      name: input.name.trim(),
+      description: input.description.trim(),
+      unitId: input.unitId,
+      isActive: input.isActive,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), ingredients: [ingredient, ...state.ingredients] };
+    persist(next);
+    set(next);
+    return { ok: true, id: ingredient.id };
+  },
+  updateIngredient: (id, input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Ingredient name is required." };
+    if (!input.unitId) return { ok: false, error: "A unit of measurement is required." };
+    const duplicate = state.ingredients.some(
+      (ingredient) =>
+        ingredient.id !== id &&
+        ingredient.name.trim().toLowerCase() === input.name.trim().toLowerCase()
+    );
+    if (duplicate) return { ok: false, error: "An ingredient with this name already exists." };
+    const next = {
+      ...snapshot(state),
+      ingredients: state.ingredients.map((ingredient) =>
+        ingredient.id === id
+          ? {
+              ...ingredient,
+              name: input.name.trim(),
+              description: input.description.trim(),
+              unitId: input.unitId,
+              isActive: input.isActive,
+              updatedAt: nowIso(),
+            }
+          : ingredient
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteIngredient: (id) => {
+    const state = get();
+    const usedInMenu = state.menuItems.some((item) =>
+      item.ingredients.some((row) => row.ingredientId === id)
+    );
+    if (usedInMenu) {
+      return {
+        ok: false,
+        error: "This ingredient cannot be deleted because it is used in one or more menu item recipes.",
+      };
+    }
+    const usedInInventory = state.inventory.some((item) => item.ingredientId === id);
+    if (usedInInventory) {
+      return {
+        ok: false,
+        error: "This ingredient cannot be deleted because it has an inventory record. Remove the inventory record first.",
+      };
+    }
+    const next = {
+      ...snapshot(state),
+      ingredients: state.ingredients.filter((ingredient) => ingredient.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createMenuItem: (input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Menu item name is required." };
+    if (!input.categoryId) return { ok: false, error: "Category is required." };
+    if (input.price < 0) return { ok: false, error: "Price cannot be negative." };
+    const ids = input.ingredients.map((row) => row.ingredientId);
+    if (new Set(ids).size !== ids.length) {
+      return { ok: false, error: "Each ingredient can only be selected once." };
+    }
+    if (input.ingredients.some((row) => row.quantity <= 0)) {
+      return { ok: false, error: "Ingredient quantities must be greater than zero." };
+    }
+    const item: MenuItem = {
+      ...input,
+      id: createId(),
+      name: input.name.trim(),
+      description: input.description.trim(),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), menuItems: [item, ...state.menuItems] };
+    persist(next);
+    set(next);
+    return {
+      ok: true,
+      id: item.id,
+      warning: inactiveIngredientWarning(item.ingredients, state.ingredients),
+    };
+  },
+  updateMenuItem: (id, input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Menu item name is required." };
+    if (!input.categoryId) return { ok: false, error: "Category is required." };
+    if (input.price < 0) return { ok: false, error: "Price cannot be negative." };
+    const ids = input.ingredients.map((row) => row.ingredientId);
+    if (new Set(ids).size !== ids.length) {
+      return { ok: false, error: "Each ingredient can only be selected once." };
+    }
+    if (input.ingredients.some((row) => row.quantity <= 0)) {
+      return { ok: false, error: "Ingredient quantities must be greater than zero." };
+    }
+    const next = {
+      ...snapshot(state),
+      menuItems: state.menuItems.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...input,
+              name: input.name.trim(),
+              description: input.description.trim(),
+              updatedAt: nowIso(),
+            }
+          : item
+      ),
+    };
+    persist(next);
+    set(next);
+    return {
+      ok: true,
+      id,
+      warning: inactiveIngredientWarning(input.ingredients, state.ingredients),
+    };
+  },
+  deleteMenuItem: (id) => {
+    const state = get();
+    const used = state.orders.some((order) =>
+      ["open", "preparing"].includes(order.status) &&
+      order.items.some((item) => item.menuItemId === id)
+    );
+    if (used) {
+      return {
+        ok: false,
+        error: "This menu item cannot be deleted because it is used on an open or preparing order.",
+      };
+    }
+    const next = {
+      ...snapshot(state),
+      menuItems: state.menuItems.filter((item) => item.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  toggleMenuAvailability: (id) => {
+    const state = get();
+    const next = {
+      ...snapshot(state),
+      menuItems: state.menuItems.map((item) =>
+        item.id === id ? { ...item, isAvailable: !item.isAvailable, updatedAt: nowIso() } : item
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  setupInventory: (input) => {
+    const state = get();
+    if (!input.ingredientId) return { ok: false, error: "Select an ingredient." };
+    if (state.inventory.some((item) => item.ingredientId === input.ingredientId)) {
+      return { ok: false, error: "This ingredient already has an inventory record." };
+    }
+    if (input.currentStock < 0 || input.minimumStock < 0 || input.costPerUnit < 0) {
+      return { ok: false, error: "Stock and cost values cannot be negative." };
+    }
+    const record: InventoryItem = {
+      id: createId(),
+      ingredientId: input.ingredientId,
+      currentStock: input.currentStock,
+      minimumStock: input.minimumStock,
+      costPerUnit: input.costPerUnit,
+      lastUpdated: nowIso(),
+    };
+    const next = { ...snapshot(state), inventory: [record, ...state.inventory] };
+    persist(next);
+    set(next);
+    return { ok: true, id: record.id };
+  },
+  updateInventoryMeta: (id, input) => {
+    const state = get();
+    if (input.minimumStock < 0 || input.costPerUnit < 0) {
+      return { ok: false, error: "Values cannot be negative." };
+    }
+    const next = {
+      ...snapshot(state),
+      inventory: state.inventory.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              minimumStock: input.minimumStock,
+              costPerUnit: input.costPerUnit,
+              lastUpdated: nowIso(),
+            }
+          : item
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  addStock: (inventoryId, quantity, reason, date) =>
+    applyStockChange(get, set, inventoryId, "IN", quantity, reason, date),
+  removeStock: (inventoryId, quantity, reason, date) =>
+    applyStockChange(get, set, inventoryId, "OUT", quantity, reason, date),
+  adjustStock: (inventoryId, newQuantity, reason, date) => {
+    const state = get();
+    const item = state.inventory.find((row) => row.id === inventoryId);
+    if (!item) return { ok: false, error: "Inventory record not found." };
+    if (newQuantity < 0) return { ok: false, error: "Stock cannot be negative." };
+    return applyAbsoluteStock(get, set, inventoryId, newQuantity, reason, date);
+  },
+  deleteInventory: (id) => {
+    const state = get();
+    const next = {
+      ...snapshot(state),
+      inventory: state.inventory.filter((item) => item.id !== id),
+      transactions: state.transactions.filter((tx) => tx.inventoryItemId !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createOrder: (input) => {
+    const state = get();
+    const table = state.tables.find((row) => row.id === input.tableId);
+    if (!table) return { ok: false, error: "Select a table." };
+    if (!input.items.length) return { ok: false, error: "Add at least one menu item." };
+    if (input.items.some((item) => item.quantity < 1)) {
+      return { ok: false, error: "Item quantities must be at least 1." };
+    }
+    const order: Order = {
+      id: createId(),
+      orderNumber: nextOrderNumber(state.orders),
+      tableId: table.id,
+      zoneId: table.zoneId,
+      status: input.status,
+      notes: input.notes.trim(),
+      items: input.items.map((item) => ({ ...item, id: createId() })),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), orders: [order, ...state.orders] };
+    persist(next);
+    set(next);
+    return { ok: true, id: order.id };
+  },
+  updateOrder: (id, input) => {
+    const state = get();
+    const table = state.tables.find((row) => row.id === input.tableId);
+    if (!table) return { ok: false, error: "Select a table." };
+    if (!input.items.length) return { ok: false, error: "Add at least one menu item." };
+    if (input.items.some((item) => item.quantity < 1)) {
+      return { ok: false, error: "Item quantities must be at least 1." };
+    }
+    const next = {
+      ...snapshot(state),
+      orders: state.orders.map((order) =>
+        order.id === id
+          ? {
+              ...order,
+              tableId: table.id,
+              zoneId: table.zoneId,
+              status: input.status,
+              notes: input.notes.trim(),
+              items: input.items.map((item) => ({
+                ...item,
+                id: createId(),
+              })),
+              updatedAt: nowIso(),
+            }
+          : order
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteOrder: (id) => {
+    const state = get();
+    const next = { ...snapshot(state), orders: state.orders.filter((order) => order.id !== id) };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createAccount: (input) => {
+    const state = get();
+    const error = validateAccountInput(state.accounts, input);
+    if (error) return { ok: false, error };
+    const account: Account = {
+      id: createId(),
+      code: input.code.trim(),
+      name: input.name.trim(),
+      type: input.type,
+      isCash: input.type === "asset" ? input.isCash : false,
+      isSystem: false,
+      isActive: input.isActive,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), accounts: [...state.accounts, account].sort(sortAccounts) };
+    persist(next);
+    set(next);
+    return { ok: true, id: account.id };
+  },
+  updateAccount: (id, input) => {
+    const state = get();
+    const existing = state.accounts.find((account) => account.id === id);
+    if (!existing) return { ok: false, error: "Account not found." };
+    const error = validateAccountInput(state.accounts, input, id);
+    if (error) return { ok: false, error };
+    if (existing.isSystem && existing.code !== input.code.trim()) {
+      return { ok: false, error: "System account codes cannot be changed." };
+    }
+    const next = {
+      ...snapshot(state),
+      accounts: state.accounts
+        .map((account) =>
+          account.id === id
+            ? {
+                ...account,
+                code: existing.isSystem ? account.code : input.code.trim(),
+                name: input.name.trim(),
+                type: existing.isSystem ? account.type : input.type,
+                isCash: (existing.isSystem ? account.type : input.type) === "asset" ? input.isCash : false,
+                isActive: input.isActive,
+                updatedAt: nowIso(),
+              }
+            : account
+        )
+        .sort(sortAccounts),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteAccount: (id) => {
+    const state = get();
+    const account = state.accounts.find((row) => row.id === id);
+    if (!account) return { ok: false, error: "Account not found." };
+    if (account.isSystem) return { ok: false, error: "System accounts cannot be deleted." };
+    const used = state.journalEntries.some((entry) =>
+      entry.lines.some((line) => line.accountId === id)
+    );
+    if (used) {
+      return { ok: false, error: "This account has journal activity. Deactivate it instead." };
+    }
+    const next = {
+      ...snapshot(state),
+      accounts: state.accounts.filter((row) => row.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createJournal: (input) => {
+    const state = get();
+    const lines: JournalLine[] = input.lines.map((line) => ({
+      ...line,
+      id: createId(),
+      description: line.description.trim(),
+      debit: Number(line.debit) || 0,
+      credit: Number(line.credit) || 0,
+    }));
+    const error = validateJournalLines(lines);
+    if (error) return { ok: false, error };
+    if (!input.date) return { ok: false, error: "Date is required." };
+    if (!input.description.trim()) return { ok: false, error: "Narration is required." };
+    const entry: JournalEntry = {
+      id: createId(),
+      number: nextDocumentNumber(
+        "JNL",
+        state.journalEntries.map((row) => row.number)
+      ),
+      date: input.date,
+      description: input.description.trim(),
+      source: "manual",
+      sourceId: null,
+      lines,
+      createdAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      journalEntries: [entry, ...state.journalEntries],
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: entry.id };
+  },
+  deleteJournal: (id) => {
+    const state = get();
+    const entry = state.journalEntries.find((row) => row.id === id);
+    if (!entry) return { ok: false, error: "Journal entry not found." };
+    if (entry.source !== "manual") {
+      return { ok: false, error: "System-posted journals cannot be deleted here. Delete the source document instead." };
+    }
+    const next = {
+      ...snapshot(state),
+      journalEntries: state.journalEntries.filter((row) => row.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createPurchase: (input) => {
+    const state = get();
+    if (!input.supplier.trim()) return { ok: false, error: "Supplier is required." };
+    if (!input.date) return { ok: false, error: "Date is required." };
+    if (!input.lines.length) return { ok: false, error: "Add at least one purchase line." };
+    if (input.lines.some((line) => !line.description.trim() || line.quantity <= 0 || line.unitCost < 0)) {
+      return { ok: false, error: "Each line needs a description, quantity and unit cost." };
+    }
+    const creditAccount = creditAccountForPayment(state.accounts, input.payment);
+    const purchasesAccount = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.purchases);
+    if (!creditAccount || !purchasesAccount) {
+      return { ok: false, error: "Required accounts are missing from the chart of accounts." };
+    }
+    const purchaseId = createId();
+    const journalId = createId();
+    const lines = input.lines.map((line) => ({
+      id: createId(),
+      description: line.description.trim(),
+      ingredientId: line.ingredientId,
+      quantity: line.quantity,
+      unitCost: line.unitCost,
+      postedToInventory: false,
+    }));
+    const total = purchaseTotal({ lines });
+    const purchase: Purchase = {
+      id: purchaseId,
+      number: nextDocumentNumber(
+        "PUR",
+        state.purchases.map((row) => row.number)
+      ),
+      supplier: input.supplier.trim(),
+      invoiceNumber: input.invoiceNumber.trim(),
+      date: input.date,
+      payment: input.payment,
+      notes: input.notes.trim(),
+      lines,
+      journalEntryId: journalId,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const journal: JournalEntry = {
+      id: journalId,
+      number: nextDocumentNumber(
+        "JNL",
+        state.journalEntries.map((row) => row.number)
+      ),
+      date: input.date,
+      description: `Purchase ${purchase.number} ${purchase.supplier}`,
+      source: "purchase",
+      sourceId: purchase.id,
+      lines: [
+        {
+          id: createId(),
+          accountId: purchasesAccount.id,
+          description: "Food purchases",
+          debit: total,
+          credit: 0,
+        },
+        {
+          id: createId(),
+          accountId: creditAccount.id,
+          description: purchase.supplier,
+          debit: 0,
+          credit: total,
+        },
+      ],
+      createdAt: nowIso(),
+    };
+    const next: AppData = {
+      ...snapshot(state),
+      purchases: [purchase, ...state.purchases],
+      journalEntries: [journal, ...state.journalEntries],
+    };
+    persist(next);
+    set(next);
+
+    const toPost = lines.filter((_, index) => input.lines[index]?.addToInventory);
+    for (const line of toPost) {
+      const result = get().postPurchaseLineToInventory(purchase.id, line.id, line.ingredientId);
+      if (!result.ok) return { ok: true, id: purchase.id, warning: result.error };
+    }
+    return { ok: true, id: purchase.id };
+  },
+  deletePurchase: (id) => {
+    const state = get();
+    const purchase = state.purchases.find((row) => row.id === id);
+    if (!purchase) return { ok: false, error: "Purchase not found." };
+    if (purchase.lines.some((line) => line.postedToInventory)) {
+      return {
+        ok: false,
+        error: "This purchase has lines posted to inventory and cannot be deleted.",
+      };
+    }
+    const next = {
+      ...snapshot(state),
+      purchases: state.purchases.filter((row) => row.id !== id),
+      journalEntries: state.journalEntries.filter(
+        (entry) => entry.id !== purchase.journalEntryId && entry.sourceId !== id
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createExpense: (input) => {
+    const state = get();
+    if (!input.payee.trim()) return { ok: false, error: "Payee is required." };
+    if (!input.date) return { ok: false, error: "Date is required." };
+    if (!input.lines.length) return { ok: false, error: "Add at least one expense line." };
+    if (input.lines.some((line) => !line.description.trim() || !line.accountId || line.amount <= 0)) {
+      return { ok: false, error: "Each line needs a description, account and amount." };
+    }
+    const invalidAccount = input.lines.some((line) => {
+      const account = state.accounts.find((row) => row.id === line.accountId);
+      return !account || account.type !== "expense";
+    });
+    if (invalidAccount) return { ok: false, error: "Expense lines must use an expense account." };
+    const creditAccount = creditAccountForPayment(state.accounts, input.payment);
+    if (!creditAccount) {
+      return { ok: false, error: "Required accounts are missing from the chart of accounts." };
+    }
+    const expenseId = createId();
+    const journalId = createId();
+    const lines = input.lines.map((line) => ({
+      id: createId(),
+      description: line.description.trim(),
+      accountId: line.accountId,
+      amount: Number(line.amount.toFixed(2)),
+    }));
+    const total = expenseTotal({ lines });
+    const expense: Expense = {
+      id: expenseId,
+      number: nextDocumentNumber(
+        "EXP",
+        state.expenses.map((row) => row.number)
+      ),
+      payee: input.payee.trim(),
+      reference: input.reference.trim(),
+      date: input.date,
+      payment: input.payment,
+      notes: input.notes.trim(),
+      lines,
+      journalEntryId: journalId,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const debitLines = lines.map((line) => ({
+      id: createId(),
+      accountId: line.accountId,
+      description: line.description,
+      debit: line.amount,
+      credit: 0,
+    }));
+    const journal: JournalEntry = {
+      id: journalId,
+      number: nextDocumentNumber(
+        "JNL",
+        state.journalEntries.map((row) => row.number)
+      ),
+      date: input.date,
+      description: `Expense ${expense.number} ${expense.payee}`,
+      source: "expense",
+      sourceId: expense.id,
+      lines: [
+        ...debitLines,
+        {
+          id: createId(),
+          accountId: creditAccount.id,
+          description: expense.payee,
+          debit: 0,
+          credit: total,
+        },
+      ],
+      createdAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      expenses: [expense, ...state.expenses],
+      journalEntries: [journal, ...state.journalEntries],
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: expense.id };
+  },
+  deleteExpense: (id) => {
+    const state = get();
+    const expense = state.expenses.find((row) => row.id === id);
+    if (!expense) return { ok: false, error: "Expense not found." };
+    const next = {
+      ...snapshot(state),
+      expenses: state.expenses.filter((row) => row.id !== id),
+      journalEntries: state.journalEntries.filter(
+        (entry) => entry.id !== expense.journalEntryId && entry.sourceId !== id
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createAsset: (input) => {
+    const state = get();
+    if (!input.name.trim()) return { ok: false, error: "Asset name is required." };
+    if (!input.acquiredOn) return { ok: false, error: "Acquisition date is required." };
+    if (input.cost <= 0) return { ok: false, error: "Cost must be greater than zero." };
+    if (input.depreciates && input.usefulLifeYears <= 0) {
+      return { ok: false, error: "Depreciating assets need a useful life in years." };
+    }
+    if (input.residualValue < 0 || input.residualValue >= input.cost) {
+      return { ok: false, error: "Residual value must be below cost." };
+    }
+    const creditAccount = creditAccountForPayment(state.accounts, input.funding);
+    const assetAccount = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.fixedAssets);
+    if (!creditAccount || !assetAccount) {
+      return { ok: false, error: "Required accounts are missing from the chart of accounts." };
+    }
+    const assetId = createId();
+    const journalId = createId();
+    const asset: FixedAsset = {
+      id: assetId,
+      number: nextDocumentNumber(
+        "AST",
+        (state.assets ?? []).map((row) => row.number)
+      ),
+      name: input.name.trim(),
+      category: input.category,
+      acquiredOn: input.acquiredOn,
+      cost: Number(input.cost.toFixed(2)),
+      funding: input.funding,
+      depreciates: input.depreciates,
+      usefulLifeMonths: input.depreciates ? Math.round(input.usefulLifeYears * 12) : 0,
+      residualValue: input.depreciates ? Number(input.residualValue.toFixed(2)) : 0,
+      accumulatedDepreciation: 0,
+      lastDepreciationDate: null,
+      notes: input.notes.trim(),
+      journalEntryId: journalId,
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const journal: JournalEntry = {
+      id: journalId,
+      number: nextDocumentNumber(
+        "JNL",
+        state.journalEntries.map((row) => row.number)
+      ),
+      date: input.acquiredOn,
+      description: `Asset ${asset.number} ${asset.name}`,
+      source: "asset",
+      sourceId: asset.id,
+      lines: [
+        {
+          id: createId(),
+          accountId: assetAccount.id,
+          description: asset.name,
+          debit: asset.cost,
+          credit: 0,
+        },
+        {
+          id: createId(),
+          accountId: creditAccount.id,
+          description: asset.name,
+          debit: 0,
+          credit: asset.cost,
+        },
+      ],
+      createdAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      assets: [asset, ...(state.assets ?? [])],
+      journalEntries: [journal, ...state.journalEntries],
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: asset.id };
+  },
+  deleteAsset: (id) => {
+    const state = get();
+    const asset = (state.assets ?? []).find((row) => row.id === id);
+    if (!asset) return { ok: false, error: "Asset not found." };
+    if (asset.accumulatedDepreciation > 0) {
+      return {
+        ok: false,
+        error: "This asset has depreciation posted and cannot be deleted.",
+      };
+    }
+    const next = {
+      ...snapshot(state),
+      assets: (state.assets ?? []).filter((row) => row.id !== id),
+      journalEntries: state.journalEntries.filter(
+        (entry) => entry.id !== asset.journalEntryId && entry.sourceId !== id
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  chargeAssetDepreciation: (id, asOfDate) => chargeOneAsset(get, set, id, asOfDate),
+  chargeAllDepreciation: (asOfDate) => {
+    const assets = (get().assets ?? []).filter((asset) => asset.depreciates);
+    let posted = 0;
+    for (const asset of assets) {
+      const result = chargeOneAsset(get, set, asset.id, asOfDate);
+      if (result.ok && result.id) posted += 1;
+    }
+    if (posted === 0) return { ok: false, error: "Nothing to depreciate up to this date." };
+    return { ok: true, warning: `Posted depreciation on ${posted} asset${posted === 1 ? "" : "s"}.` };
+  },
+  createEmployee: (input) => {
+    const state = get();
+    if (!input.firstName.trim() || !input.lastName.trim()) {
+      return { ok: false, error: "First name and last name are required." };
+    }
+    if (!input.jobTitle.trim()) return { ok: false, error: "Job title is required." };
+    if (!input.startDate) return { ok: false, error: "Start date is required." };
+    if (input.basicSalary < 0) return { ok: false, error: "Basic salary cannot be negative." };
+    const employee: Employee = {
+      ...input,
+      id: createId(),
+      employeeNumber: nextDocumentNumber(
+        "EMP",
+        (state.employees ?? []).map((row) => row.employeeNumber)
+      ),
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      nid: input.nid.trim(),
+      jobTitle: input.jobTitle.trim(),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = { ...snapshot(state), employees: [employee, ...(state.employees ?? [])] };
+    persist(next);
+    set(next);
+    return { ok: true, id: employee.id };
+  },
+  updateEmployee: (id, input) => {
+    const state = get();
+    if (!input.firstName.trim() || !input.lastName.trim()) {
+      return { ok: false, error: "First name and last name are required." };
+    }
+    const next = {
+      ...snapshot(state),
+      employees: (state.employees ?? []).map((employee) =>
+        employee.id === id
+          ? {
+              ...employee,
+              ...input,
+              firstName: input.firstName.trim(),
+              lastName: input.lastName.trim(),
+              nid: input.nid.trim(),
+              jobTitle: input.jobTitle.trim(),
+              updatedAt: nowIso(),
+            }
+          : employee
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteEmployee: (id) => {
+    const state = get();
+    const used = (state.payslips ?? []).some((slip) => slip.employeeId === id);
+    if (used) {
+      return { ok: false, error: "This employee has payslips. Deactivate the record instead." };
+    }
+    const next = {
+      ...snapshot(state),
+      employees: (state.employees ?? []).filter((employee) => employee.id !== id),
+      leaveRequests: (state.leaveRequests ?? []).filter((row) => row.employeeId !== id),
+      attendance: (state.attendance ?? []).filter((row) => row.employeeId !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  createLeave: (input) => {
+    const state = get();
+    if (!input.employeeId) return { ok: false, error: "Select an employee." };
+    if (!input.from || !input.to) return { ok: false, error: "Leave dates are required." };
+    const request: LeaveRequest = {
+      id: createId(),
+      employeeId: input.employeeId,
+      type: input.type,
+      from: input.from,
+      to: input.to,
+      days: leaveDaysInRange(input.from, input.to),
+      reason: input.reason.trim(),
+      status: "pending",
+      createdAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      leaveRequests: [request, ...(state.leaveRequests ?? [])],
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: request.id };
+  },
+  setLeaveStatus: (id, status) => {
+    const state = get();
+    const next = {
+      ...snapshot(state),
+      leaveRequests: (state.leaveRequests ?? []).map((row) =>
+        row.id === id ? { ...row, status } : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteLeave: (id) => {
+    const state = get();
+    const next = {
+      ...snapshot(state),
+      leaveRequests: (state.leaveRequests ?? []).filter((row) => row.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  upsertAttendance: (input) => {
+    const state = get();
+    if (!input.employeeId || !input.date) return { ok: false, error: "Employee and date are required." };
+    const existing = (state.attendance ?? []).find(
+      (row) => row.employeeId === input.employeeId && row.date === input.date
+    );
+    const record: AttendanceRecord = {
+      id: existing?.id ?? createId(),
+      employeeId: input.employeeId,
+      date: input.date,
+      status: input.status,
+      clockIn: input.clockIn,
+      clockOut: input.clockOut,
+      hoursWorked: input.hoursWorked,
+      overtimeHours: input.overtimeHours,
+      publicHolidayHours: input.publicHolidayHours,
+      notes: input.notes.trim(),
+    };
+    const attendance = existing
+      ? (state.attendance ?? []).map((row) => (row.id === existing.id ? record : row))
+      : [record, ...(state.attendance ?? [])];
+    const next = { ...snapshot(state), attendance };
+    persist(next);
+    set(next);
+    return { ok: true, id: record.id };
+  },
+  deleteAttendance: (id) => {
+    const state = get();
+    const next = {
+      ...snapshot(state),
+      attendance: (state.attendance ?? []).filter((row) => row.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  generatePayslips: (period, employeeId) => {
+    const state = get();
+    if (!/^\d{4}-\d{2}$/.test(period)) return { ok: false, error: "Use a pay period such as 2026-10." };
+    const policy = state.payrollPolicy ?? defaultPayrollPolicy();
+    const active = (state.employees ?? []).filter(
+      (employee) => employee.isActive && (!employeeId || employee.id === employeeId)
+    );
+    if (!active.length) return { ok: false, error: employeeId ? "Employee is not active." : "No active employees." };
+    let slips = [...(state.payslips ?? [])];
+    for (const employee of active) {
+      slips = slips.filter((slip) => !(slip.employeeId === employee.id && slip.period === period));
+      const built = buildPayslip({
+        employee,
+        period,
+        attendance: state.attendance ?? [],
+        leave: state.leaveRequests ?? [],
+        holidays: state.holidays ?? [],
+        policy,
+        number: nextDocumentNumber(
+          "PAY",
+          slips.map((slip) => slip.number)
+        ),
+      });
+      slips = [
+        {
+          ...built,
+          id: createId(),
+          createdAt: nowIso(),
+        },
+        ...slips,
+      ];
+    }
+    const next = { ...snapshot(state), payslips: slips };
+    persist(next);
+    set(next);
+    return { ok: true, warning: `Payslips generated for ${active.length} employee${active.length === 1 ? "" : "s"}.` };
+  },
+  deletePayslip: (id) => {
+    const state = get();
+    const next = {
+      ...snapshot(state),
+      payslips: (state.payslips ?? []).filter((slip) => slip.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  updatePayrollPolicy: (input) => {
+    const state = get();
+    const next = { ...snapshot(state), payrollPolicy: input };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  addHoliday: (date, name) => {
+    const state = get();
+    if (!date || !name.trim()) return { ok: false, error: "Date and holiday name are required." };
+    if ((state.holidays ?? []).some((holiday) => holiday.date === date)) {
+      return { ok: false, error: "That date is already a public holiday." };
+    }
+    const holiday = { id: createId(), date, name: name.trim() };
+    const next = {
+      ...snapshot(state),
+      holidays: [...(state.holidays ?? []), holiday].sort((a, b) => a.date.localeCompare(b.date)),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: holiday.id };
+  },
+  deleteHoliday: (id) => {
+    const state = get();
+    const next = {
+      ...snapshot(state),
+      holidays: (state.holidays ?? []).filter((holiday) => holiday.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  postPurchaseLineToInventory: (purchaseId, lineId, ingredientId) => {
+    const state = get();
+    const purchase = state.purchases.find((row) => row.id === purchaseId);
+    if (!purchase) return { ok: false, error: "Purchase not found." };
+    const line = purchase.lines.find((row) => row.id === lineId);
+    if (!line) return { ok: false, error: "Purchase line not found." };
+    if (line.postedToInventory) return { ok: false, error: "This line is already in inventory." };
+    const resolvedIngredientId = ingredientId || line.ingredientId;
+    if (!resolvedIngredientId) {
+      return { ok: false, error: "Select an ingredient before posting this line to inventory." };
+    }
+    const ingredient = state.ingredients.find((row) => row.id === resolvedIngredientId);
+    if (!ingredient) return { ok: false, error: "Ingredient not found." };
+    const inventoryAccount = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.inventory);
+    const purchasesAccount = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.purchases);
+    if (!inventoryAccount || !purchasesAccount) {
+      return { ok: false, error: "Inventory or purchases account is missing." };
+    }
+
+    const amount = lineAmount(line);
+    const reason = `${purchase.number} ${line.description}`;
+    const stockDate = `${purchase.date}T09:00:00.000Z`;
+    const existing = state.inventory.find((row) => row.ingredientId === resolvedIngredientId);
+    let inventory = state.inventory;
+    let transactions = state.transactions;
+
+    if (existing) {
+      const nextStock = Number((existing.currentStock + line.quantity).toFixed(4));
+      const updated: InventoryItem = {
+        ...existing,
+        currentStock: nextStock,
+        costPerUnit: line.unitCost,
+        lastUpdated: stockDate,
+      };
+      const transaction: InventoryTransaction = {
+        id: createId(),
+        inventoryItemId: existing.id,
+        type: "IN",
+        quantityChange: line.quantity,
+        previousStock: existing.currentStock,
+        newStock: nextStock,
+        reason,
+        createdAt: stockDate,
+      };
+      inventory = state.inventory.map((row) => (row.id === existing.id ? updated : row));
+      transactions = [transaction, ...state.transactions];
+    } else {
+      const record: InventoryItem = {
+        id: createId(),
+        ingredientId: resolvedIngredientId,
+        currentStock: line.quantity,
+        minimumStock: 0,
+        costPerUnit: line.unitCost,
+        lastUpdated: stockDate,
+      };
+      inventory = [record, ...state.inventory];
+    }
+
+    const journal: JournalEntry = {
+      id: createId(),
+      number: nextDocumentNumber(
+        "JNL",
+        state.journalEntries.map((row) => row.number)
+      ),
+      date: purchase.date,
+      description: `Stock from ${purchase.number} ${line.description}`,
+      source: "inventory",
+      sourceId: purchase.id,
+      lines: [
+        {
+          id: createId(),
+          accountId: inventoryAccount.id,
+          description: line.description,
+          debit: amount,
+          credit: 0,
+        },
+        {
+          id: createId(),
+          accountId: purchasesAccount.id,
+          description: "Reclassify to inventory",
+          debit: 0,
+          credit: amount,
+        },
+      ],
+      createdAt: nowIso(),
+    };
+
+    const next = {
+      ...snapshot(state),
+      inventory,
+      transactions,
+      journalEntries: [journal, ...state.journalEntries],
+      purchases: state.purchases.map((row) =>
+        row.id === purchase.id
+          ? {
+              ...row,
+              lines: row.lines.map((item) =>
+                item.id === line.id
+                  ? { ...item, ingredientId: resolvedIngredientId, postedToInventory: true }
+                  : item
+              ),
+              updatedAt: nowIso(),
+            }
+          : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: purchase.id };
+  },
+}));
+
+function applyStockChange(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  inventoryId: string,
+  type: Exclude<InventoryTransactionType, "ADJUSTMENT">,
+  quantity: number,
+  reason: string,
+  date?: string
+): ActionResult {
+  if (quantity <= 0) return { ok: false, error: "Quantity must be greater than zero." };
+  const state = get();
+  const item = state.inventory.find((row) => row.id === inventoryId);
+  if (!item) return { ok: false, error: "Inventory record not found." };
+  const delta = type === "IN" ? quantity : -quantity;
+  const nextStock = Number((item.currentStock + delta).toFixed(4));
+  if (nextStock < 0) return { ok: false, error: "Stock cannot go below zero." };
+  return writeStock(state, set, item, type, delta, nextStock, reason, date);
+}
+
+function applyAbsoluteStock(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  inventoryId: string,
+  newQuantity: number,
+  reason: string,
+  date?: string
+): ActionResult {
+  const state = get();
+  const item = state.inventory.find((row) => row.id === inventoryId);
+  if (!item) return { ok: false, error: "Inventory record not found." };
+  const nextStock = Number(newQuantity.toFixed(4));
+  const delta = Number((nextStock - item.currentStock).toFixed(4));
+  return writeStock(state, set, item, "ADJUSTMENT", delta, nextStock, reason, date);
+}
+
+function writeStock(
+  state: AppState,
+  set: (partial: Partial<AppState>) => void,
+  item: InventoryItem,
+  type: InventoryTransactionType,
+  quantityChange: number,
+  newStock: number,
+  reason: string,
+  date?: string
+): ActionResult {
+  const updated: InventoryItem = {
+    ...item,
+    currentStock: newStock,
+    lastUpdated: date ? new Date(date).toISOString() : nowIso(),
+  };
+  const transaction = {
+    id: createId(),
+    inventoryItemId: item.id,
+    type,
+    quantityChange,
+    previousStock: item.currentStock,
+    newStock,
+    reason: reason.trim() || (type === "IN" ? "Stock received" : type === "OUT" ? "Stock removed" : "Stock adjusted"),
+    createdAt: date ? new Date(date).toISOString() : nowIso(),
+  };
+  const next = {
+    ...snapshot(state),
+    inventory: state.inventory.map((row) => (row.id === item.id ? updated : row)),
+    transactions: [transaction, ...state.transactions],
+  };
+  persist(next);
+  set(next);
+  return { ok: true, id: item.id };
+}
+
+function sortAccounts(a: Account, b: Account) {
+  return a.code.localeCompare(b.code);
+}
+
+function validateAccountInput(accounts: Account[], input: AccountInput, id?: string) {
+  if (!input.code.trim()) return "Account code is required.";
+  if (!/^\d{4,6}$/.test(input.code.trim())) return "Use a 4 to 6 digit account code.";
+  if (!input.name.trim()) return "Account name is required.";
+  const duplicateCode = accounts.some(
+    (account) => account.id !== id && account.code === input.code.trim()
+  );
+  if (duplicateCode) return "An account with this code already exists.";
+  const types: AccountType[] = ["asset", "liability", "equity", "income", "expense"];
+  if (!types.includes(input.type)) return "Select an account type.";
+  return null;
+}
+
+function creditAccountForPayment(accounts: Account[], payment: PurchasePayment | AssetFunding) {
+  if (payment === "cash") return accountByCode(accounts, SYSTEM_ACCOUNT_CODES.cash);
+  if (payment === "bank") return accountByCode(accounts, SYSTEM_ACCOUNT_CODES.bank);
+  if (payment === "capital") return accountByCode(accounts, SYSTEM_ACCOUNT_CODES.capital);
+  return accountByCode(accounts, SYSTEM_ACCOUNT_CODES.payable);
+}
+
+function chargeOneAsset(
+  get: () => AppState,
+  set: (partial: Partial<AppState>) => void,
+  id: string,
+  asOfDate?: string
+): ActionResult {
+  const state = get();
+  const asset = (state.assets ?? []).find((row) => row.id === id);
+  if (!asset) return { ok: false, error: "Asset not found." };
+  if (!asset.depreciates) return { ok: false, error: "This asset does not depreciate." };
+  const date = asOfDate || new Date().toISOString().slice(0, 10);
+  const amount = pendingDepreciation(asset, date);
+  if (amount <= 0) return { ok: false, error: "This asset is already depreciated up to this date." };
+  const expenseAccount = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.depreciation);
+  const accumAccount = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.accumDep);
+  if (!expenseAccount || !accumAccount) {
+    return { ok: false, error: "Depreciation accounts are missing from the chart of accounts." };
+  }
+  const journal: JournalEntry = {
+    id: createId(),
+    number: nextDocumentNumber(
+      "JNL",
+      state.journalEntries.map((row) => row.number)
+    ),
+    date,
+    description: `Depreciation ${asset.number} ${asset.name}`,
+    source: "depreciation",
+    sourceId: asset.id,
+    lines: [
+      {
+        id: createId(),
+        accountId: expenseAccount.id,
+        description: "Straight-line depreciation",
+        debit: amount,
+        credit: 0,
+      },
+      {
+        id: createId(),
+        accountId: accumAccount.id,
+        description: asset.name,
+        debit: 0,
+        credit: amount,
+      },
+    ],
+    createdAt: nowIso(),
+  };
+  const next = {
+    ...snapshot(state),
+    journalEntries: [journal, ...state.journalEntries],
+    assets: (state.assets ?? []).map((row) =>
+      row.id === id
+        ? {
+            ...row,
+            accumulatedDepreciation: Number((row.accumulatedDepreciation + amount).toFixed(2)),
+            lastDepreciationDate: date,
+            updatedAt: nowIso(),
+          }
+        : row
+    ),
+  };
+  persist(next);
+  set(next);
+  return { ok: true, id: asset.id };
+}
