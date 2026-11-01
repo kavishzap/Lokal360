@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const employees = useAppStore((state) => state.employees);
   const leaveRequests = useAppStore((state) => state.leaveRequests);
   const payslips = useAppStore((state) => state.payslips);
+  const payrollRuns = useAppStore((state) => state.payrollRuns);
 
   const today = new Date();
   const monthFrom = format(startOfMonth(today), "yyyy-MM-dd");
@@ -61,7 +62,21 @@ export default function DashboardPage() {
     const depreciation = journals
       .filter((entry) => entry.source === "depreciation" && inDateRange(entry.date, from, to))
       .reduce((sum, entry) => sum + entry.lines.reduce((lineSum, line) => lineSum + line.debit, 0), 0);
-    return { sales, food, running, depreciation, left: sales - food - running - depreciation };
+    const wageIds = new Set(
+      accounts
+        .filter((account) =>
+          ["5300", "5310", "5320", "5330", "5340"].includes(account.code)
+        )
+        .map((account) => account.id)
+    );
+    const payroll = journals
+      .filter((entry) => entry.source === "payroll" && inDateRange(entry.date, from, to))
+      .reduce(
+        (sum, entry) =>
+          sum + entry.lines.filter((line) => wageIds.has(line.accountId)).reduce((lineSum, line) => lineSum + line.debit, 0),
+        0
+      );
+    return { sales, food, running, depreciation, payroll, left: sales - food - running - depreciation - payroll };
   };
 
   const month = movement(monthFrom, monthTo);
@@ -90,6 +105,7 @@ export default function DashboardPage() {
   const missingPayslips = activeStaff.filter(
     (employee) => !payslips.some((slip) => slip.employeeId === employee.id && slip.period === period)
   );
+  const payrollRun = payrollRuns.find((run) => run.period === period);
 
   const attention = [
     floor.length
@@ -133,7 +149,7 @@ export default function DashboardPage() {
       : null,
     missingPayslips.length
       ? {
-          href: "/dashboard/payroll/payslips",
+          href: "/dashboard/payroll/run",
           title:
             locale === "fr"
               ? `Les fiches de ${monthLabel} ne sont pas prêtes`
@@ -146,9 +162,57 @@ export default function DashboardPage() {
               : locale === "mfe"
                 ? `${missingPayslips.length} anplwaye aktif bizwin ankor enn bilten`
                 : `${missingPayslips.length} active employee${missingPayslips.length === 1 ? "" : "s"} still need a slip`,
-          action: "Open payslips",
+          action: "Pay and file",
         }
-      : null,
+      : !payrollRun?.journalEntryId
+        ? {
+            href: "/dashboard/payroll/run",
+            title:
+              locale === "fr"
+                ? `La paie de ${monthLabel} n'est pas dans les livres`
+                : locale === "mfe"
+                  ? `Lapey ${monthLabel} pa dan liv`
+                  : `${monthLabel} payroll is not in the books`,
+            detail: "Post the wage bill before you pay or file",
+            action: "Pay and file",
+          }
+        : !payrollRun.paymentJournalId
+          ? {
+              href: "/dashboard/payroll/run",
+              title:
+                locale === "fr"
+                  ? `Les salaires de ${monthLabel} ne sont pas payés`
+                  : locale === "mfe"
+                    ? `Saler ${monthLabel} pa ankor pey`
+                    : `${monthLabel} salaries are not paid`,
+              detail: "Download the bank file and record the payment",
+              action: "Pay and file",
+            }
+          : !payrollRun.filedOn
+            ? {
+                href: "/dashboard/payroll/run",
+                title:
+                  locale === "fr"
+                    ? `La déclaration MRA de ${monthLabel} n'est pas faite`
+                    : locale === "mfe"
+                      ? `Deklarasyon MRA ${monthLabel} pa ankor fer`
+                      : `${monthLabel} return is not filed with the MRA`,
+                detail: "Download the return and mark it filed",
+                action: "Pay and file",
+              }
+            : !payrollRun.remittanceJournalId
+              ? {
+                  href: "/dashboard/payroll/run",
+                  title:
+                    locale === "fr"
+                      ? `PAYE et contributions de ${monthLabel} pas encore versés`
+                      : locale === "mfe"
+                        ? `PAYE ek kontribisyon ${monthLabel} pa ankor vwayaze`
+                        : `${monthLabel} PAYE and contributions are not remitted`,
+                  detail: "Send the statutory amounts from the bank",
+                  action: "Pay and file",
+                }
+              : null,
   ].filter((item): item is { href: string; title: string; detail: string; action: string } => Boolean(item));
 
   return (
@@ -174,7 +238,7 @@ export default function DashboardPage() {
         <StatCard
           title="Left after costs"
           value={formatMUR(left)}
-          hint="Sales, less food, running costs and depreciation"
+          hint="Sales, less food, wages, running costs and depreciation"
           icon={Wallet}
           tone={left < 0 ? "red" : "green"}
         />
@@ -230,8 +294,8 @@ export default function DashboardPage() {
         <Link href="/dashboard/inventory" className="text-slate-600 hover:text-slate-900">
           {t("Inventory")}
         </Link>
-        <Link href="/dashboard/payroll/payslips" className="text-slate-600 hover:text-slate-900">
-          {t("Payslips")}
+        <Link href="/dashboard/payroll/run" className="text-slate-600 hover:text-slate-900">
+          {t("Pay and file")}
         </Link>
       </div>
     </div>

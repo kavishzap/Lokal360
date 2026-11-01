@@ -118,7 +118,14 @@ export type AccountType = "asset" | "liability" | "equity" | "income" | "expense
 
 export type PurchasePayment = "cash" | "bank" | "credit";
 
-export type JournalSource = "manual" | "purchase" | "inventory" | "expense" | "asset" | "depreciation";
+export type JournalSource =
+  | "manual"
+  | "purchase"
+  | "inventory"
+  | "expense"
+  | "asset"
+  | "depreciation"
+  | "payroll";
 
 export type AssetFunding = PurchasePayment | "capital";
 
@@ -254,6 +261,7 @@ export interface Employee {
   email: string;
   maritalStatus: "single" | "married" | "other";
   bankName: string;
+  bankCode: string;
   bankAccount: string;
   jobTitle: string;
   department: string;
@@ -268,6 +276,7 @@ export interface Employee {
   edfReliefAnnual: number;
   prgfEligible: boolean;
   notes: string;
+  portalPassword: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -328,6 +337,20 @@ export interface Payslip {
   overtimeHours: number;
   status: PayslipStatus;
   createdAt: string;
+}
+
+export interface PayrollRun {
+  id: string;
+  period: string;
+  journalEntryId: string | null;
+  paymentJournalId: string | null;
+  remittanceJournalId: string | null;
+  paidOn: string | null;
+  filedOn: string | null;
+  paymentReference: string;
+  filingReference: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PayrollPolicy {
@@ -392,6 +415,7 @@ export interface AppData {
   leaveRequests: LeaveRequest[];
   attendance: AttendanceRecord[];
   payslips: Payslip[];
+  payrollRuns: PayrollRun[];
   payrollPolicy: PayrollPolicy;
   company: CompanyProfile;
 }
@@ -400,6 +424,7 @@ export interface SessionUser {
   email: string;
   name: string;
   role: string;
+  employeeId: string | null;
   rememberMe: boolean;
   loggedInAt: string;
 }

@@ -175,7 +175,7 @@ export default function PayslipsPage() {
               <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Employee deductions</p>
               <Row label="CSG" value={formatMUR(viewing.csgEmployee)} />
               <Row label="NSF" value={formatMUR(viewing.nsfEmployee)} />
-              <Row label="PAYE (estimate)" value={formatMUR(viewing.paye)} />
+              <Row label="PAYE" value={formatMUR(viewing.paye)} />
             </div>
             <Row label="Net pay" value={formatMUR(viewing.net)} strong />
             <div className="border-t pt-3">

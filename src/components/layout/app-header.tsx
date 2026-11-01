@@ -40,14 +40,16 @@ export function AppHeader() {
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="flex items-center justify-between gap-4 px-4 py-3 lg:px-6">
         <div className="flex min-w-0 items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setMobileNavOpen(true)}
-          >
-            <Menu />
-          </Button>
+          {session?.role === "Staff" ? null : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu />
+            </Button>
+          )}
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold text-slate-900">{t(meta.title)}</h1>
             <Breadcrumb className="hidden sm:block">
@@ -94,13 +96,17 @@ export function AppHeader() {
             />
             <DropdownMenuContent align="end" className="min-w-52">
               <DropdownMenuLabel>{t("Account")}</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-                <User /> {t("Profile")}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-                <Settings /> {t("Settings")}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {session?.role === "Staff" ? null : (
+                <>
+                  <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+                    <User /> {t("Profile")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+                    <Settings /> {t("Settings")}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem
                 variant="destructive"
                 onClick={() => {

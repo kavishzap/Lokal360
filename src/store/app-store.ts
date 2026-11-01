@@ -10,7 +10,7 @@ import {
 } from "@/lib/accounting";
 import { pendingDepreciation } from "@/lib/assets";
 import { defaultCompany } from "@/lib/company";
-import { buildPayslip, defaultPayrollPolicy, leaveDaysInRange } from "@/lib/payroll";
+import { buildPayslip, defaultPayrollPolicy, employeeName, leaveDaysInRange, payrollTotals, periodBounds } from "@/lib/payroll";
 import { createId, nowIso } from "@/lib/format";
 import { nextOrderNumber } from "@/lib/orders";
 import { emptyData, loadAppData, resetAppData, saveAppData } from "@/lib/storage";
@@ -31,6 +31,7 @@ import type {
   LeaveStatus,
   LeaveType,
   PayrollPolicy,
+  PayrollRun,
   Ingredient,
   InventoryItem,
   InventoryTransaction,
@@ -200,6 +201,14 @@ interface AppState extends AppData {
   deleteAttendance: (id: string) => ActionResult;
   generatePayslips: (period: string, employeeId?: string) => ActionResult;
   deletePayslip: (id: string) => ActionResult;
+  postPayroll: (period: string) => ActionResult;
+  paySalaries: (period: string, date: string, reference: string) => ActionResult;
+  filePayroll: (period: string, date: string, reference: string) => ActionResult;
+  remitPayroll: (period: string, date: string, reference: string) => ActionResult;
+  undoPayrollPost: (period: string) => ActionResult;
+  undoSalaryPayment: (period: string) => ActionResult;
+  undoPayrollFiling: (period: string) => ActionResult;
+  undoRemittance: (period: string) => ActionResult;
   updatePayrollPolicy: (input: PayrollPolicy) => ActionResult;
   updateCompany: (input: CompanyProfile) => ActionResult;
   addHoliday: (date: string, name: string) => ActionResult;
@@ -236,6 +245,7 @@ function snapshot(state: AppState): AppData {
     leaveRequests: state.leaveRequests ?? [],
     attendance: state.attendance ?? [],
     payslips: state.payslips ?? [],
+    payrollRuns: state.payrollRuns ?? [],
     payrollPolicy: state.payrollPolicy ?? defaultPayrollPolicy(),
     company: state.company ?? defaultCompany(),
   };
@@ -1426,6 +1436,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   generatePayslips: (period, employeeId) => {
     const state = get();
     if (!/^\d{4}-\d{2}$/.test(period)) return { ok: false, error: "Use a pay period such as 2026-10." };
+    if ((state.payrollRuns ?? []).some((run) => run.period === period && run.journalEntryId)) {
+      return { ok: false, error: "This month is already in the books. Undo the posting before you calculate again." };
+    }
     const policy = state.payrollPolicy ?? defaultPayrollPolicy();
     const active = (state.employees ?? []).filter(
       (employee) => employee.isActive && (!employeeId || employee.id === employeeId)
@@ -1433,6 +1446,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!active.length) return { ok: false, error: employeeId ? "Employee is not active." : "No active employees." };
     let slips = [...(state.payslips ?? [])];
     for (const employee of active) {
+      const priorPayslips = slips.filter((slip) => slip.employeeId === employee.id && slip.period !== period);
       slips = slips.filter((slip) => !(slip.employeeId === employee.id && slip.period === period));
       const built = buildPayslip({
         employee,
@@ -1441,6 +1455,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         leave: state.leaveRequests ?? [],
         holidays: state.holidays ?? [],
         policy,
+        priorPayslips,
         number: nextDocumentNumber(
           "PAY",
           slips.map((slip) => slip.number)
@@ -1462,9 +1477,309 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   deletePayslip: (id) => {
     const state = get();
+    const slip = (state.payslips ?? []).find((row) => row.id === id);
+    if (!slip) return { ok: false, error: "Payslip not found." };
+    if ((state.payrollRuns ?? []).some((run) => run.period === slip.period && run.journalEntryId)) {
+      return { ok: false, error: "This month is in the books. Undo the posting before you delete a slip." };
+    }
     const next = {
       ...snapshot(state),
-      payslips: (state.payslips ?? []).filter((slip) => slip.id !== id),
+      payslips: (state.payslips ?? []).filter((row) => row.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  postPayroll: (period) => {
+    const state = get();
+    const slips = (state.payslips ?? []).filter((slip) => slip.period === period);
+    if (!slips.length) return { ok: false, error: "Calculate the month before you post it." };
+    const active = (state.employees ?? []).filter((employee) => employee.isActive);
+    const missing = active.filter((employee) => !slips.some((slip) => slip.employeeId === employee.id));
+    if (missing.length) {
+      return {
+        ok: false,
+        error: `Calculate a slip for ${missing.map((employee) => employeeName(employee)).join(", ")} first.`,
+      };
+    }
+    const existing = (state.payrollRuns ?? []).find((run) => run.period === period);
+    if (existing?.journalEntryId) return { ok: false, error: "This month is already in the books." };
+    const totals = payrollTotals(slips);
+    if (totals.employerCost <= 0) return { ok: false, error: "There is nothing to post for this month." };
+    const codes = [
+      [SYSTEM_ACCOUNT_CODES.wages, "Wages and salaries"],
+      [SYSTEM_ACCOUNT_CODES.employerCsg, "Employer CSG"],
+      [SYSTEM_ACCOUNT_CODES.employerNsf, "Employer NSF"],
+      [SYSTEM_ACCOUNT_CODES.hrdc, "HRDC training levy"],
+      [SYSTEM_ACCOUNT_CODES.prgfExpense, "PRGF"],
+      [SYSTEM_ACCOUNT_CODES.netWages, "Net wages payable"],
+      [SYSTEM_ACCOUNT_CODES.payePayable, "PAYE payable"],
+      [SYSTEM_ACCOUNT_CODES.csgPayable, "CSG payable"],
+      [SYSTEM_ACCOUNT_CODES.nsfPayable, "NSF payable"],
+      [SYSTEM_ACCOUNT_CODES.hrdcPayable, "HRDC levy payable"],
+      [SYSTEM_ACCOUNT_CODES.prgfPayable, "PRGF payable"],
+    ] as const;
+    const accounts = Object.fromEntries(
+      codes.map(([code, label]) => {
+        const account = accountByCode(state.accounts, code);
+        return [code, account ? account.id : label];
+      })
+    );
+    const missingAccount = codes.find(([code]) => !state.accounts.some((account) => account.code === code));
+    if (missingAccount) {
+      return { ok: false, error: "Payroll accounts are missing from the chart. Reload the page and try again." };
+    }
+    const line = (code: string, description: string, debit: number, credit: number): JournalLine | null => {
+      if (debit <= 0 && credit <= 0) return null;
+      return {
+        id: createId(),
+        accountId: accounts[code] as string,
+        description,
+        debit,
+        credit,
+      };
+    };
+    const lines = [
+      line(SYSTEM_ACCOUNT_CODES.wages, "Gross pay", totals.wagesExpense, 0),
+      line(SYSTEM_ACCOUNT_CODES.employerCsg, "Employer CSG", totals.csgEmployer, 0),
+      line(SYSTEM_ACCOUNT_CODES.employerNsf, "Employer NSF", totals.nsfEmployer, 0),
+      line(SYSTEM_ACCOUNT_CODES.hrdc, "HRDC training levy", totals.hrdc, 0),
+      line(SYSTEM_ACCOUNT_CODES.prgfExpense, "PRGF", totals.prgf, 0),
+      line(SYSTEM_ACCOUNT_CODES.netWages, "Net wages", 0, totals.net),
+      line(SYSTEM_ACCOUNT_CODES.payePayable, "PAYE", 0, totals.paye),
+      line(SYSTEM_ACCOUNT_CODES.csgPayable, "CSG", 0, totals.csgPayable),
+      line(SYSTEM_ACCOUNT_CODES.nsfPayable, "NSF", 0, totals.nsfPayable),
+      line(SYSTEM_ACCOUNT_CODES.hrdcPayable, "HRDC", 0, totals.hrdc),
+      line(SYSTEM_ACCOUNT_CODES.prgfPayable, "PRGF", 0, totals.prgf),
+    ].filter((row): row is JournalLine => Boolean(row));
+    const invalid = validateJournalLines(lines);
+    if (invalid) return { ok: false, error: invalid };
+    const runId = existing?.id ?? createId();
+    const bounds = periodBounds(period);
+    const today = new Date().toISOString().slice(0, 10);
+    const postingDate = today < bounds.from ? bounds.from : today < bounds.to ? today : bounds.to;
+    const entry: JournalEntry = {
+      id: createId(),
+      number: nextDocumentNumber("JNL", state.journalEntries.map((row) => row.number)),
+      date: postingDate,
+      description: `Payroll ${period}`,
+      source: "payroll",
+      sourceId: runId,
+      lines,
+      createdAt: nowIso(),
+    };
+    const run: PayrollRun = {
+      id: runId,
+      period,
+      journalEntryId: entry.id,
+      paymentJournalId: existing?.paymentJournalId ?? null,
+      remittanceJournalId: existing?.remittanceJournalId ?? null,
+      paidOn: existing?.paidOn ?? null,
+      filedOn: existing?.filedOn ?? null,
+      paymentReference: existing?.paymentReference ?? "",
+      filingReference: existing?.filingReference ?? "",
+      createdAt: existing?.createdAt ?? nowIso(),
+      updatedAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      journalEntries: [entry, ...state.journalEntries],
+      payrollRuns: [run, ...(state.payrollRuns ?? []).filter((row) => row.period !== period)],
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: entry.id, warning: `Payroll for ${period} is in the books.` };
+  },
+  paySalaries: (period, date, reference) => {
+    const state = get();
+    if (!date) return { ok: false, error: "Payment date is required." };
+    const run = (state.payrollRuns ?? []).find((row) => row.period === period);
+    if (!run?.journalEntryId) return { ok: false, error: "Post the month to the books before you pay it." };
+    if (run.paymentJournalId) return { ok: false, error: "Salaries for this month are already paid." };
+    const slips = (state.payslips ?? []).filter((slip) => slip.period === period);
+    const unpaid = slips
+      .map((slip) => (state.employees ?? []).find((employee) => employee.id === slip.employeeId))
+      .filter((employee): employee is Employee => Boolean(employee))
+      .filter((employee) => !employee.bankName.trim() || !employee.bankAccount.trim());
+    if (unpaid.length) {
+      return {
+        ok: false,
+        error: `Add a bank and account number for ${unpaid.map((employee) => employeeName(employee)).join(", ")}.`,
+      };
+    }
+    const totals = payrollTotals(slips);
+    if (totals.net <= 0) return { ok: false, error: "Net pay is zero, so there is nothing to send to the bank." };
+    const bank = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.bank);
+    const wages = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.netWages);
+    if (!bank || !wages) return { ok: false, error: "Bank or net wages account is missing." };
+    const entry: JournalEntry = {
+      id: createId(),
+      number: nextDocumentNumber("JNL", state.journalEntries.map((row) => row.number)),
+      date,
+      description: `Salary payment ${period}${reference.trim() ? ` · ${reference.trim()}` : ""}`,
+      source: "payroll",
+      sourceId: run.id,
+      lines: [
+        { id: createId(), accountId: wages.id, description: "Net wages", debit: totals.net, credit: 0 },
+        { id: createId(), accountId: bank.id, description: "Bank", debit: 0, credit: totals.net },
+      ],
+      createdAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      journalEntries: [entry, ...state.journalEntries],
+      payrollRuns: (state.payrollRuns ?? []).map((row) =>
+        row.period === period
+          ? { ...row, paymentJournalId: entry.id, paidOn: date, paymentReference: reference.trim(), updatedAt: nowIso() }
+          : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: entry.id, warning: `Salaries for ${period} are marked paid.` };
+  },
+  filePayroll: (period, date, reference) => {
+    const state = get();
+    if (!date) return { ok: false, error: "Filing date is required." };
+    if (!reference.trim()) return { ok: false, error: "Enter the MRA acknowledgement or your own filing reference." };
+    const tan = (state.company?.tan ?? "").trim();
+    if (!tan) return { ok: false, error: "Add the company TAN in Settings before you file." };
+    const run = (state.payrollRuns ?? []).find((row) => row.period === period);
+    if (!run?.journalEntryId) return { ok: false, error: "Post the month before you file it." };
+    if (run.filedOn) return { ok: false, error: "This return is already marked filed." };
+    const next = {
+      ...snapshot(state),
+      payrollRuns: (state.payrollRuns ?? []).map((row) =>
+        row.period === period
+          ? { ...row, filedOn: date, filingReference: reference.trim(), updatedAt: nowIso() }
+          : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, warning: `The ${period} return is marked filed.` };
+  },
+  remitPayroll: (period, date, reference) => {
+    const state = get();
+    if (!date) return { ok: false, error: "Remittance date is required." };
+    const run = (state.payrollRuns ?? []).find((row) => row.period === period);
+    if (!run?.filedOn) return { ok: false, error: "Mark the return filed before you remit it." };
+    if (run.remittanceJournalId) return { ok: false, error: "Statutory contributions for this month are already remitted." };
+    const slips = (state.payslips ?? []).filter((slip) => slip.period === period);
+    const totals = payrollTotals(slips);
+    const bank = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.bank);
+    if (!bank) return { ok: false, error: "Bank account is missing." };
+    const credits: { code: string; description: string; amount: number }[] = [
+      { code: SYSTEM_ACCOUNT_CODES.payePayable, description: "PAYE", amount: totals.paye },
+      { code: SYSTEM_ACCOUNT_CODES.csgPayable, description: "CSG", amount: totals.csgPayable },
+      { code: SYSTEM_ACCOUNT_CODES.nsfPayable, description: "NSF", amount: totals.nsfPayable },
+      { code: SYSTEM_ACCOUNT_CODES.hrdcPayable, description: "HRDC", amount: totals.hrdc },
+      { code: SYSTEM_ACCOUNT_CODES.prgfPayable, description: "PRGF", amount: totals.prgf },
+    ].filter((row) => row.amount > 0);
+    if (!credits.length) return { ok: false, error: "There is nothing to remit for this month." };
+    const lines: JournalLine[] = [];
+    for (const row of credits) {
+      const account = accountByCode(state.accounts, row.code);
+      if (!account) return { ok: false, error: "A statutory account is missing." };
+      lines.push({
+        id: createId(),
+        accountId: account.id,
+        description: row.description,
+        debit: row.amount,
+        credit: 0,
+      });
+    }
+    const remitted = Number(lines.reduce((sum, row) => sum + row.debit, 0).toFixed(2));
+    lines.push({
+      id: createId(),
+      accountId: bank.id,
+      description: "Bank",
+      debit: 0,
+      credit: remitted,
+    });
+    const invalid = validateJournalLines(lines);
+    if (invalid) return { ok: false, error: invalid };
+    const entry: JournalEntry = {
+      id: createId(),
+      number: nextDocumentNumber("JNL", state.journalEntries.map((row) => row.number)),
+      date,
+      description: `MRA remittance ${period}${reference.trim() ? ` · ${reference.trim()}` : ""}`,
+      source: "payroll",
+      sourceId: run.id,
+      lines,
+      createdAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      journalEntries: [entry, ...state.journalEntries],
+      payrollRuns: (state.payrollRuns ?? []).map((row) =>
+        row.period === period ? { ...row, remittanceJournalId: entry.id, updatedAt: nowIso() } : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: entry.id, warning: `PAYE and contributions for ${period} left the bank.` };
+  },
+  undoPayrollPost: (period) => {
+    const state = get();
+    const run = (state.payrollRuns ?? []).find((row) => row.period === period);
+    if (!run?.journalEntryId) return { ok: false, error: "This month is not in the books." };
+    if (run.paymentJournalId || run.remittanceJournalId) {
+      return { ok: false, error: "Undo the salary payment and the remittance first." };
+    }
+    const next = {
+      ...snapshot(state),
+      journalEntries: state.journalEntries.filter((entry) => entry.id !== run.journalEntryId),
+      payrollRuns: (state.payrollRuns ?? []).map((row) =>
+        row.period === period ? { ...row, journalEntryId: null, updatedAt: nowIso() } : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  undoSalaryPayment: (period) => {
+    const state = get();
+    const run = (state.payrollRuns ?? []).find((row) => row.period === period);
+    if (!run?.paymentJournalId) return { ok: false, error: "Salaries for this month are not marked paid." };
+    const next = {
+      ...snapshot(state),
+      journalEntries: state.journalEntries.filter((entry) => entry.id !== run.paymentJournalId),
+      payrollRuns: (state.payrollRuns ?? []).map((row) =>
+        row.period === period
+          ? { ...row, paymentJournalId: null, paidOn: null, paymentReference: "", updatedAt: nowIso() }
+          : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  undoPayrollFiling: (period) => {
+    const state = get();
+    const run = (state.payrollRuns ?? []).find((row) => row.period === period);
+    if (!run?.filedOn) return { ok: false, error: "This return is not marked filed." };
+    if (run.remittanceJournalId) return { ok: false, error: "Undo the remittance before you undo the filing." };
+    const next = {
+      ...snapshot(state),
+      payrollRuns: (state.payrollRuns ?? []).map((row) =>
+        row.period === period ? { ...row, filedOn: null, filingReference: "", updatedAt: nowIso() } : row
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  undoRemittance: (period) => {
+    const state = get();
+    const run = (state.payrollRuns ?? []).find((row) => row.period === period);
+    if (!run?.remittanceJournalId) return { ok: false, error: "Nothing has been remitted for this month." };
+    const next = {
+      ...snapshot(state),
+      journalEntries: state.journalEntries.filter((entry) => entry.id !== run.remittanceJournalId),
+      payrollRuns: (state.payrollRuns ?? []).map((row) =>
+        row.period === period ? { ...row, remittanceJournalId: null, updatedAt: nowIso() } : row
+      ),
     };
     persist(next);
     set(next);

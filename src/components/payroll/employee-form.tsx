@@ -35,6 +35,7 @@ const schema = z.object({
   email: z.string(),
   maritalStatus: z.enum(["single", "married", "other"]),
   bankName: z.string(),
+  bankCode: z.string(),
   bankAccount: z.string(),
   jobTitle: z.string().min(1, "Job title is required"),
   department: z.string(),
@@ -48,6 +49,7 @@ const schema = z.object({
   edfReliefAnnual: z.number().min(0),
   prgfEligible: z.boolean(),
   notes: z.string(),
+  portalPassword: z.string(),
 });
 
 type Values = z.infer<typeof schema>;
@@ -65,6 +67,7 @@ function toValues(employee?: Employee | null): Values {
     email: employee?.email ?? "",
     maritalStatus: employee?.maritalStatus ?? "single",
     bankName: employee?.bankName ?? "",
+    bankCode: employee?.bankCode ?? "",
     bankAccount: employee?.bankAccount ?? "",
     jobTitle: employee?.jobTitle ?? "",
     department: employee?.department ?? "",
@@ -78,6 +81,7 @@ function toValues(employee?: Employee | null): Values {
     edfReliefAnnual: employee?.edfReliefAnnual ?? 0,
     prgfEligible: employee?.prgfEligible ?? true,
     notes: employee?.notes ?? "",
+    portalPassword: employee?.portalPassword ?? "",
   };
 }
 
@@ -109,6 +113,7 @@ export function EmployeeForm({ employee }: { employee?: Employee | null }) {
       email: values.email,
       maritalStatus: values.maritalStatus,
       bankName: values.bankName,
+      bankCode: values.bankCode.trim().toUpperCase(),
       bankAccount: values.bankAccount,
       jobTitle: values.jobTitle,
       department: values.department,
@@ -123,6 +128,7 @@ export function EmployeeForm({ employee }: { employee?: Employee | null }) {
       edfReliefAnnual: values.edfReliefAnnual,
       prgfEligible: values.prgfEligible,
       notes: values.notes,
+      portalPassword: values.portalPassword,
     };
     const result = employee ? updateEmployee(employee.id, payload) : createEmployee(payload);
     if (!result.ok) {
@@ -284,6 +290,9 @@ export function EmployeeForm({ employee }: { employee?: Employee | null }) {
             <Field label="Bank">
               <Input {...form.register("bankName")} placeholder="MCB" />
             </Field>
+            <Field label="Bank code">
+              <Input {...form.register("bankCode")} placeholder="MCBLMUMU" />
+            </Field>
             <Field label="Account number">
               <Input {...form.register("bankAccount")} />
             </Field>
@@ -296,6 +305,12 @@ export function EmployeeForm({ employee }: { employee?: Employee | null }) {
               render={({ field }) => <Switch checked={field.value} onCheckedChange={field.onChange} />}
             />
           </label>
+          <Field label="Staff password">
+            <Input type="text" autoComplete="off" {...form.register("portalPassword")} placeholder="Staff123!" />
+            <p className="text-xs text-slate-500">
+              Used with the work email on the login page. Leave it blank to keep this person off the staff sign-in.
+            </p>
+          </Field>
           <Field label="Notes">
             <Textarea rows={3} {...form.register("notes")} />
           </Field>

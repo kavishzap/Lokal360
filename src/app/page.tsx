@@ -12,7 +12,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!hydrated) return;
-    router.replace(session ? "/dashboard" : "/login");
+    router.replace(session ? (session.role === "Staff" ? "/dashboard/me" : "/dashboard") : "/login");
   }, [hydrated, session, router]);
 
   return <PageSpinner />;

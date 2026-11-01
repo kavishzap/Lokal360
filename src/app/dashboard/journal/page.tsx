@@ -25,6 +25,7 @@ const SOURCE_LABEL = {
   expense: "Expense",
   asset: "Asset",
   depreciation: "Depreciation",
+  payroll: "Payroll",
 };
 
 export default function JournalPage() {

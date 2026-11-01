@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useTranslate } from "@/i18n/use-translate";
-import { APP_NAME, DEMO_CREDENTIALS } from "@/lib/constants";
+import { APP_NAME, DEMO_CREDENTIALS, STAFF_PASSWORD } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth-store";
 
 const schema = z.object({
@@ -80,7 +80,7 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    if (hydrated && session) router.replace("/dashboard");
+    if (hydrated && session) router.replace(session.role === "Staff" ? "/dashboard/me" : "/dashboard");
   }, [hydrated, session, router]);
 
   const trackPointer = (event: ReactPointerEvent<HTMLElement>) => {
@@ -106,7 +106,7 @@ export default function LoginPage() {
       setError(result);
       return;
     }
-    router.push("/dashboard");
+    router.push(useAuthStore.getState().session?.role === "Staff" ? "/dashboard/me" : "/dashboard");
   };
 
   return (
@@ -277,6 +277,9 @@ export default function LoginPage() {
             <p className="font-medium text-slate-800">{t("Demo credentials")}</p>
             <p>Email: {DEMO_CREDENTIALS.email}</p>
             <p>Password: {DEMO_CREDENTIALS.password}</p>
+            <p className="mt-2 font-medium text-slate-800">{t("Staff")}</p>
+            <p>Email: meera.ramdoyal@b42.mu</p>
+            <p>Password: {STAFF_PASSWORD}</p>
           </div>
         </div>
       </div>

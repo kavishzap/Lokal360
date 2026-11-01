@@ -109,6 +109,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/dashboard/payroll/leave", label: "Leave", icon: CalendarDays },
       { href: "/dashboard/payroll/attendance", label: "Attendance", icon: Clock },
       { href: "/dashboard/payroll/payslips", label: "Payslips", icon: Banknote },
+      { href: "/dashboard/payroll/run", label: "Pay and file", icon: Landmark },
       { href: "/dashboard/payroll/policies", label: "Policies", icon: ScrollText },
     ],
   },
@@ -326,6 +327,14 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
         { label: "Payslips" },
       ],
     },
+    "/dashboard/payroll/run": {
+      title: "Pay and file",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Payroll" },
+        { label: "Pay and file" },
+      ],
+    },
     "/dashboard/payroll/policies": {
       title: "Payroll policies",
       crumbs: [
@@ -333,6 +342,10 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
         { label: "Payroll" },
         { label: "Policies" },
       ],
+    },
+    "/dashboard/me": {
+      title: "My pay",
+      crumbs: [{ label: "My pay" }],
     },
     "/dashboard/settings": {
       title: "Settings",

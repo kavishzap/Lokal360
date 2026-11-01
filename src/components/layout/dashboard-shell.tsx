@@ -21,18 +21,35 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const mobileNavOpen = useUiStore((state) => state.mobileNavOpen);
   const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
 
+  const staff = session?.role === "Staff";
+
   useEffect(() => {
     if (authHydrated && !session) router.replace("/login");
   }, [authHydrated, session, router]);
 
   useEffect(() => {
+    if (!session) return;
+    if (staff && pathname !== "/dashboard/me") router.replace("/dashboard/me");
+    if (!staff && pathname === "/dashboard/me") router.replace("/dashboard");
+  }, [session, staff, pathname, router]);
+
+  useEffect(() => {
     setMobileNavOpen(false);
   }, [pathname, setMobileNavOpen]);
 
-  if (!authHydrated || !appHydrated || !session) {
+  if (!authHydrated || !appHydrated || !session || (staff && pathname !== "/dashboard/me")) {
     return (
       <div className="min-h-screen bg-slate-50">
         <PageSpinner />
+      </div>
+    );
+  }
+
+  if (staff) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC]">
+        <AppHeader />
+        <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
       </div>
     );
   }

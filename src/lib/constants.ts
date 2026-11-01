@@ -15,3 +15,5 @@ export const DEMO_USER = {
   name: "Alex Martin",
   role: "Administrator",
 };
+
+export const STAFF_PASSWORD = "Staff123!";

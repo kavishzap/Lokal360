@@ -14,6 +14,7 @@ export default function PnlReportPage() {
   const purchases = useAppStore((state) => state.purchases ?? []);
   const expenses = useAppStore((state) => state.expenses ?? []);
   const journals = useAppStore((state) => state.journalEntries);
+  const accounts = useAppStore((state) => state.accounts);
   const query = useReportQuery();
 
   const figures = useMemo(() => {
@@ -32,10 +33,20 @@ export default function PnlReportPage() {
         (sum, entry) => sum + entry.lines.reduce((lineSum, line) => lineSum + line.debit, 0),
         0
       );
+    const wageIds = new Set(
+      accounts.filter((account) => ["5300", "5310", "5320", "5330", "5340"].includes(account.code)).map((account) => account.id)
+    );
+    const wages = journals
+      .filter((entry) => entry.source === "payroll" && inDateRange(entry.date, query.from, query.to))
+      .reduce(
+        (sum, entry) =>
+          sum + entry.lines.filter((line) => wageIds.has(line.accountId)).reduce((lineSum, line) => lineSum + line.debit, 0),
+        0
+      );
     const gross = sales - cogs;
-    const net = gross - opex - depreciation;
-    return { sales, cogs, opex, depreciation, gross, net };
-  }, [orders, purchases, expenses, journals, query.from, query.to]);
+    const net = gross - opex - wages - depreciation;
+    return { sales, cogs, opex, wages, depreciation, gross, net };
+  }, [orders, purchases, expenses, journals, accounts, query.from, query.to]);
 
   const ownerView = query.audience === "owner";
   const margin = percent(figures.net, figures.sales);
@@ -52,6 +63,7 @@ export default function PnlReportPage() {
       amount: -figures.opex,
       tone: "muted" as const,
     },
+    { label: ownerView ? "Wages and contributions" : "Payroll", amount: -figures.wages, tone: "muted" as const },
     { label: "Depreciation", amount: -figures.depreciation, tone: "muted" as const },
     { label: ownerView ? "What is left" : "Net profit / (loss)", amount: figures.net, tone: "total" as const },
   ];

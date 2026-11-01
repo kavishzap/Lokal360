@@ -21,11 +21,22 @@ export const SYSTEM_ACCOUNT_CODES = {
   fixedAssets: "1200",
   accumDep: "1205",
   payable: "2000",
+  netWages: "2100",
+  payePayable: "2110",
+  csgPayable: "2120",
+  nsfPayable: "2130",
+  hrdcPayable: "2140",
+  prgfPayable: "2150",
   capital: "3000",
   sales: "4000",
   purchases: "5000",
   expenses: "5100",
   depreciation: "5200",
+  wages: "5300",
+  employerCsg: "5310",
+  employerNsf: "5320",
+  hrdc: "5330",
+  prgfExpense: "5340",
 } as const;
 
 export function isDebitNormal(type: AccountType) {
