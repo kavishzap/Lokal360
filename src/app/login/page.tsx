@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useTranslate } from "@/i18n/use-translate";
 import { APP_NAME, DEMO_CREDENTIALS, STAFF_PASSWORD } from "@/lib/constants";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth-store";
 
 const schema = z.object({
@@ -73,7 +74,7 @@ export default function LoginPage() {
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
-      email: DEMO_CREDENTIALS.email,
+      email: isSupabaseConfigured() ? "" : DEMO_CREDENTIALS.email,
       password: "",
       rememberMe: true,
     },
@@ -100,8 +101,8 @@ export default function LoginPage() {
     event.currentTarget.style.setProperty("--ny", "0");
   };
 
-  const onSubmit = (values: Values) => {
-    const result = login(values.email, values.password, values.rememberMe);
+  const onSubmit = async (values: Values) => {
+    const result = await login(values.email, values.password, values.rememberMe);
     if (result) {
       setError(result);
       return;
@@ -185,7 +186,11 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
-          <p className="text-xs text-slate-500">{t("Demo authentication only. No production backend.")}</p>
+          <p className="text-xs text-slate-500">
+            {isSupabaseConfigured()
+              ? "One restaurant. The floor, the books and the wage bill."
+              : t("Demo authentication only. No production backend.")}
+          </p>
         </div>
       </div>
 
@@ -218,7 +223,9 @@ export default function LoginPage() {
             <LanguageSwitch />
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            {t("Use the demo administrator account to explore the prototype.")}
+            {isSupabaseConfigured()
+              ? "Sign in with the owner account for this restaurant."
+              : t("Use the demo administrator account to explore the prototype.")}
           </p>
 
           <form className="mt-6 space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
@@ -268,18 +275,24 @@ export default function LoginPage() {
                 {error}
               </div>
             ) : null}
-            <Button type="submit" className="h-10 w-full">
-              {t("Login")}
+            <Button type="submit" className="h-10 w-full" disabled={form.formState.isSubmitting}>
+              {form.formState.isSubmitting ? t("Signing in…") : t("Login")}
             </Button>
           </form>
 
           <div className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            <p className="font-medium text-slate-800">{t("Demo credentials")}</p>
-            <p>Email: {DEMO_CREDENTIALS.email}</p>
-            <p>Password: {DEMO_CREDENTIALS.password}</p>
-            <p className="mt-2 font-medium text-slate-800">{t("Staff")}</p>
-            <p>Email: meera.ramdoyal@b42.mu</p>
-            <p>Password: {STAFF_PASSWORD}</p>
+            {isSupabaseConfigured() ? (
+              <p>Sign in with the owner account you added in Supabase. The first account is the administrator.</p>
+            ) : (
+              <>
+                <p className="font-medium text-slate-800">{t("Demo credentials")}</p>
+                <p>Email: {DEMO_CREDENTIALS.email}</p>
+                <p>Password: {DEMO_CREDENTIALS.password}</p>
+                <p className="mt-2 font-medium text-slate-800">{t("Staff")}</p>
+                <p>Email: meera.ramdoyal@b42.mu</p>
+                <p>Password: {STAFF_PASSWORD}</p>
+              </>
+            )}
           </div>
         </div>
       </div>

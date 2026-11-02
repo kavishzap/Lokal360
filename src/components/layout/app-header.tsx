@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -95,27 +96,29 @@ export function AppHeader() {
               }
             />
             <DropdownMenuContent align="end" className="min-w-52">
-              <DropdownMenuLabel>{t("Account")}</DropdownMenuLabel>
-              {session?.role === "Staff" ? null : (
-                <>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-                    <User /> {t("Profile")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
-                    <Settings /> {t("Settings")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => {
-                  logout();
-                  router.push("/login");
-                }}
-              >
-                <LogOut /> {t("Logout")}
-              </DropdownMenuItem>
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>{t("Account")}</DropdownMenuLabel>
+                {session?.role === "Staff" ? null : (
+                  <>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+                      <User /> {t("Profile")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+                      <Settings /> {t("Settings")}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => {
+                    logout();
+                    router.push("/login");
+                  }}
+                >
+                  <LogOut /> {t("Logout")}
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

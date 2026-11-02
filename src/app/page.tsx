@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { PageSpinner } from "@/components/shared/loading-skeleton";
+import { OfficeLoading } from "@/components/shared/loading-skeleton";
 import { useAuthStore } from "@/store/auth-store";
 
 export default function HomePage() {
@@ -15,5 +15,5 @@ export default function HomePage() {
     router.replace(session ? (session.role === "Staff" ? "/dashboard/me" : "/dashboard") : "/login");
   }, [hydrated, session, router]);
 
-  return <PageSpinner />;
+  return <OfficeLoading />;
 }

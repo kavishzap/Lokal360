@@ -5,7 +5,30 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "cn"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+const SelectLabelContext = React.createContext<(items: Record<string, string>) => void>(() => {})
+
+function Select<Value = string>({ ...props }: SelectPrimitive.Root.Props<Value>) {
+  const [items, setItems] = React.useState<Record<string, string>>({})
+  const setIfChanged = React.useCallback((next: Record<string, string>) => {
+    setItems((current) => {
+      const currentKeys = Object.keys(current)
+      const nextKeys = Object.keys(next)
+      if (
+        currentKeys.length === nextKeys.length &&
+        nextKeys.every((key) => current[key] === next[key])
+      ) {
+        return current
+      }
+      return next
+    })
+  }, [])
+
+  return (
+    <SelectLabelContext.Provider value={setIfChanged}>
+      <SelectPrimitive.Root {...props} items={items} />
+    </SelectLabelContext.Provider>
+  )
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
@@ -55,6 +78,29 @@ function SelectTrigger({
   )
 }
 
+function itemLabel(node: React.ReactNode): string {
+  if (node == null || typeof node === "boolean") return ""
+  if (typeof node === "string" || typeof node === "number") return String(node)
+  if (Array.isArray(node)) return node.map(itemLabel).join("")
+  if (React.isValidElement<{ children?: React.ReactNode }>(node)) return itemLabel(node.props.children)
+  return ""
+}
+
+function collectSelectItems(children: React.ReactNode, into: Record<string, string>) {
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement<{ value?: unknown; children?: React.ReactNode }>(child)) return
+    if (child.type === React.Fragment) {
+      collectSelectItems(child.props.children, into)
+      return
+    }
+    if ("value" in child.props && child.props.value != null && child.props.value !== "") {
+      const label = itemLabel(child.props.children).trim()
+      if (label) into[String(child.props.value)] = label
+    }
+    if (child.props.children) collectSelectItems(child.props.children, into)
+  })
+}
+
 function SelectContent({
   className,
   children,
@@ -69,6 +115,17 @@ function SelectContent({
     SelectPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
   >) {
+  const setItems = React.useContext(SelectLabelContext)
+  const collected = React.useMemo(() => {
+    const next: Record<string, string> = {}
+    collectSelectItems(children, next)
+    return next
+  }, [children])
+
+  React.useLayoutEffect(() => {
+    setItems(collected)
+  }, [collected, setItems])
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner

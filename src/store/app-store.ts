@@ -14,6 +14,9 @@ import { buildPayslip, defaultPayrollPolicy, employeeName, leaveDaysInRange, pay
 import { createId, nowIso } from "@/lib/format";
 import { nextOrderNumber } from "@/lib/orders";
 import { emptyData, loadAppData, resetAppData, saveAppData } from "@/lib/storage";
+import { DATA_SLICES, type DataSlice } from "@/lib/data-slices";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { isRemoteSignedIn, loadSlices, loadedSliceNames, noteSignedOut, scheduleRemoteSave } from "@/lib/supabase/sync";
 import type {
   Account,
   AccountType,
@@ -134,7 +137,10 @@ type AttendanceInput = {
 
 interface AppState extends AppData {
   hydrated: boolean;
-  hydrate: () => void;
+  loadedSlices: DataSlice[];
+  hydrate: () => Promise<void>;
+  ensureSlices: (slices: DataSlice[]) => Promise<void>;
+  clearRemote: () => void;
   resetDemo: () => void;
   createZone: (input: ZoneInput) => ActionResult;
   updateZone: (id: string, input: ZoneInput) => ActionResult;
@@ -220,7 +226,14 @@ interface AppState extends AppData {
   ) => ActionResult;
 }
 
+let remoteHydrateGeneration = 0;
+let appHydrateInflight: Promise<void> | null = null;
+
 function persist(data: AppData) {
+  if (isSupabaseConfigured()) {
+    scheduleRemoteSave(data);
+    return;
+  }
   saveAppData(data);
 }
 
@@ -264,16 +277,62 @@ function inactiveIngredientWarning(items: MenuItemIngredient[], ingredients: Ing
 export const useAppStore = create<AppState>((set, get) => ({
   ...emptyData(),
   hydrated: false,
+  loadedSlices: [],
   hydrate: () => {
-    try {
-      set({ ...loadAppData(), hydrated: true });
-    } catch (error) {
-      console.error(error);
-      set({ ...emptyData(), hydrated: true });
-    }
+    if (appHydrateInflight) return appHydrateInflight;
+    const generation = ++remoteHydrateGeneration;
+    appHydrateInflight = (async () => {
+      if (!isSupabaseConfigured()) {
+        try {
+          set({ ...loadAppData(), hydrated: true, loadedSlices: [...DATA_SLICES] });
+        } catch (error) {
+          console.error(error);
+          set({ ...emptyData(), hydrated: true, loadedSlices: [...DATA_SLICES] });
+        }
+        return;
+      }
+      if (generation !== remoteHydrateGeneration) return;
+      if (!isRemoteSignedIn()) {
+        noteSignedOut();
+        set({ ...emptyData(), hydrated: true, loadedSlices: [] });
+        return;
+      }
+      try {
+        const data = await loadSlices(["company"]);
+        if (generation !== remoteHydrateGeneration) return;
+        set({ ...data, hydrated: true, loadedSlices: loadedSliceNames() });
+      } catch (error) {
+        if (generation !== remoteHydrateGeneration) return;
+        console.error(error);
+        set({ hydrated: true });
+      }
+    })().finally(() => {
+      appHydrateInflight = null;
+    });
+    return appHydrateInflight;
+  },
+  ensureSlices: (slices) => {
+    if (!isSupabaseConfigured()) return Promise.resolve();
+    const missing = slices.filter((slice) => !get().loadedSlices.includes(slice));
+    if (missing.length === 0) return Promise.resolve();
+    return loadSlices(missing)
+      .then((data) => {
+        set({ ...data, loadedSlices: loadedSliceNames() });
+      })
+      .catch((error: unknown) => {
+        console.error(error);
+        throw error;
+      });
+  },
+  clearRemote: () => {
+    remoteHydrateGeneration += 1;
+    appHydrateInflight = null;
+    noteSignedOut();
+    set({ ...emptyData(), hydrated: true, loadedSlices: [] });
   },
   resetDemo: () => {
-    set({ ...resetAppData(), hydrated: true });
+    if (isSupabaseConfigured()) return;
+    set({ ...resetAppData(), hydrated: true, loadedSlices: [...DATA_SLICES] });
   },
   createZone: (input) => {
     const state = get();
@@ -411,10 +470,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   createCategory: (input) => {
     const state = get();
-    if (!input.name.trim()) return { ok: false, error: "Category name is required." };
+    const name = input.name.trim();
+    if (!name) return { ok: false, error: "Category name is required." };
+    const duplicate = state.categories.some(
+      (category) => category.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) return { ok: false, error: "A category with this name already exists." };
     const category: MenuCategory = {
       id: createId(),
-      name: input.name.trim(),
+      name,
       description: input.description.trim(),
       image: input.image,
       displayOrder: input.displayOrder || state.categories.length + 1,
@@ -429,14 +493,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   updateCategory: (id, input) => {
     const state = get();
-    if (!input.name.trim()) return { ok: false, error: "Category name is required." };
+    const name = input.name.trim();
+    if (!name) return { ok: false, error: "Category name is required." };
+    const duplicate = state.categories.some(
+      (category) => category.id !== id && category.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) return { ok: false, error: "A category with this name already exists." };
     const next = {
       ...snapshot(state),
       categories: state.categories.map((category) =>
         category.id === id
           ? {
               ...category,
-              name: input.name.trim(),
+              name,
               description: input.description.trim(),
               image: input.image,
               displayOrder: input.displayOrder,

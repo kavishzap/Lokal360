@@ -5,7 +5,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: true,
   retries: 0,
-  reporter: [["list"]],
+  reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL: "http://localhost:3100",
     trace: "retain-on-failure",
@@ -15,6 +15,11 @@ export default defineConfig({
     url: "http://localhost:3100/login",
     timeout: 120_000,
     reuseExistingServer: false,
+    env: {
+      E2E_DIST: "1",
+      NEXT_PUBLIC_SUPABASE_URL: "",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+    },
   },
   projects: [
     {

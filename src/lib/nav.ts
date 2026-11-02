@@ -35,6 +35,7 @@ export interface NavChild {
   href: string;
   label: string;
   icon: LucideIcon;
+  locked?: boolean;
 }
 
 export interface NavSection {
@@ -43,6 +44,7 @@ export interface NavSection {
   icon: LucideIcon;
   href?: string;
   exact?: boolean;
+  locked?: boolean;
   children?: NavChild[];
 }
 
@@ -95,12 +97,6 @@ export const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    id: "ai-analytics",
-    label: "AI Analytics",
-    icon: Sparkles,
-    href: "/dashboard/ai-analytics",
-  },
-  {
     id: "payroll",
     label: "Payroll",
     icon: Users,
@@ -111,6 +107,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/dashboard/payroll/payslips", label: "Payslips", icon: Banknote },
       { href: "/dashboard/payroll/run", label: "Pay and file", icon: Landmark },
       { href: "/dashboard/payroll/policies", label: "Policies", icon: ScrollText },
+      { href: "/dashboard/ai-analytics", label: "AI Analytics", icon: Sparkles, locked: true },
     ],
   },
   {
@@ -283,6 +280,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "AI Analytics",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
+        { label: "Payroll" },
         { label: "AI Analytics" },
       ],
     },

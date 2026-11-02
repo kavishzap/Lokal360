@@ -3,9 +3,6 @@
 import { endOfMonth, format, startOfMonth, startOfYear } from "date-fns";
 import { fr as french } from "date-fns/locale";
 import Link from "next/link";
-import { Banknote, ClipboardList, TrendingUp, Users, Wallet } from "lucide-react";
-import { PageHeader } from "@/components/shared/page-header";
-import { StatCard } from "@/components/shared/stat-card";
 import {
   SYSTEM_ACCOUNT_CODES,
   accountBalance,
@@ -15,39 +12,50 @@ import {
 } from "@/lib/accounting";
 import { useTranslate } from "@/i18n/use-translate";
 import { formatMUR } from "@/lib/format";
-import { getStockStatus } from "@/lib/inventory";
 import { orderTotal } from "@/lib/orders";
 import { inDateRange } from "@/lib/reports";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
+
+const KREOL_MONTHS = ["zanvie", "fevriye", "mars", "avril", "me", "zin", "zilye", "out", "septam", "oktob", "novam", "desam"];
+
+const WAGE_CODES = ["5300", "5310", "5320", "5330", "5340"];
+const STATUTORY_CODES = [
+  SYSTEM_ACCOUNT_CODES.payePayable,
+  SYSTEM_ACCOUNT_CODES.csgPayable,
+  SYSTEM_ACCOUNT_CODES.nsfPayable,
+  SYSTEM_ACCOUNT_CODES.hrdcPayable,
+  SYSTEM_ACCOUNT_CODES.prgfPayable,
+];
 
 export default function DashboardPage() {
   const session = useAuthStore((state) => state.session);
   const { locale, t } = useTranslate();
-  const kreolMonths = ["zanvie", "fevriye", "mars", "avril", "me", "zin", "zilye", "out", "septam", "oktob", "novam", "desam"];
   const orders = useAppStore((state) => state.orders);
   const purchases = useAppStore((state) => state.purchases);
   const expenses = useAppStore((state) => state.expenses);
   const journals = useAppStore((state) => state.journalEntries);
   const accounts = useAppStore((state) => state.accounts);
-  const inventory = useAppStore((state) => state.inventory);
-  const employees = useAppStore((state) => state.employees);
-  const leaveRequests = useAppStore((state) => state.leaveRequests);
-  const payslips = useAppStore((state) => state.payslips);
-  const payrollRuns = useAppStore((state) => state.payrollRuns);
 
   const today = new Date();
+  const yearLabel = format(today, "yyyy");
+  const period = format(today, "yyyy-MM");
   const monthFrom = format(startOfMonth(today), "yyyy-MM-dd");
   const monthTo = format(endOfMonth(today), "yyyy-MM-dd");
   const yearFrom = format(startOfYear(today), "yyyy-MM-dd");
   const todayIso = format(today, "yyyy-MM-dd");
-  const period = format(today, "yyyy-MM");
-  const monthLabel =
-    locale === "fr"
-      ? format(today, "MMMM yyyy", { locale: french })
-      : locale === "mfe"
-        ? `${kreolMonths[today.getMonth()]} ${format(today, "yyyy")}`
-        : format(today, "MMMM yyyy");
+  const hello = locale === "fr" ? "Bonjour" : locale === "mfe" ? "Bonzour" : "Hello";
+  const firstName = session?.name.split(" ")[0] ?? "";
+
+  const monthName = (date: Date, style: "MMMM" | "MMM") => {
+    if (locale === "fr") return format(date, style, { locale: french });
+    if (locale === "mfe") {
+      const name = KREOL_MONTHS[date.getMonth()];
+      return style === "MMM" ? name.slice(0, 3) : name;
+    }
+    return format(date, style);
+  };
 
   const movement = (from: string, to: string) => {
     const sales = orders
@@ -62,13 +70,7 @@ export default function DashboardPage() {
     const depreciation = journals
       .filter((entry) => entry.source === "depreciation" && inDateRange(entry.date, from, to))
       .reduce((sum, entry) => sum + entry.lines.reduce((lineSum, line) => lineSum + line.debit, 0), 0);
-    const wageIds = new Set(
-      accounts
-        .filter((account) =>
-          ["5300", "5310", "5320", "5330", "5340"].includes(account.code)
-        )
-        .map((account) => account.id)
-    );
+    const wageIds = new Set(accounts.filter((account) => WAGE_CODES.includes(account.code)).map((account) => account.id));
     const payroll = journals
       .filter((entry) => entry.source === "payroll" && inDateRange(entry.date, from, to))
       .reduce(
@@ -80,223 +82,151 @@ export default function DashboardPage() {
   };
 
   const month = movement(monthFrom, monthTo);
-  const quietMonth = month.sales === 0 && month.food === 0 && month.running === 0;
-  const figures = quietMonth ? movement(yearFrom, todayIso) : month;
-  const yearLabel = format(today, "yyyy");
-  const periodLabel = quietMonth
-    ? locale === "fr"
-      ? `${yearLabel} jusqu'ici`
-      : locale === "mfe"
-        ? `${yearLabel} ziska zordi`
-        : `${yearLabel} so far`
-    : monthLabel;
-  const { sales, left } = figures;
+  const year = movement(yearFrom, todayIso);
+  const months = Array.from({ length: today.getMonth() + 1 }, (_, index) => {
+    const start = new Date(today.getFullYear(), index, 1);
+    const key = format(start, "yyyy-MM");
+    return {
+      key,
+      name: monthName(start, "MMMM"),
+      short: monthName(start, "MMM"),
+      ...movement(format(start, "yyyy-MM-dd"), format(endOfMonth(start), "yyyy-MM-dd")),
+    };
+  });
+  const latest = [...months].reverse().find((row) => row.sales > 0);
+  const peak = Math.max(...months.map((row) => row.sales), 1);
+  const caption = !latest
+    ? t("No takings yet this year.")
+    : latest.key === period
+      ? ""
+      : locale === "fr"
+        ? `${latest.name} a fait ${formatMUR(latest.sales)}.`
+        : locale === "mfe"
+          ? `${latest.name} inn fer ${formatMUR(latest.sales)}.`
+          : `${latest.name} took ${formatMUR(latest.sales)}.`;
 
-  const cash = accountByCode(accounts, SYSTEM_ACCOUNT_CODES.cash);
-  const bank = accountByCode(accounts, SYSTEM_ACCOUNT_CODES.bank);
-  const money =
-    (cash ? accountBalance(cash, journals).balance : 0) + (bank ? accountBalance(bank, journals).balance : 0);
+  const balanceOf = (code: string) => {
+    const account = accountByCode(accounts, code);
+    return account ? accountBalance(account, journals).balance : 0;
+  };
+  const cashBalance = balanceOf(SYSTEM_ACCOUNT_CODES.cash);
+  const bankBalance = balanceOf(SYSTEM_ACCOUNT_CODES.bank);
+  const wagesOwed = balanceOf(SYSTEM_ACCOUNT_CODES.netWages);
+  const statutory = STATUTORY_CODES.reduce((sum, code) => sum + balanceOf(code), 0);
 
-  const activeStaff = employees.filter((employee) => employee.isActive);
-  const wageBill = activeStaff.reduce((sum, employee) => sum + employee.basicSalary, 0);
-  const floor = orders.filter((order) => order.status === "open" || order.status === "preparing");
-  const stockAlerts = inventory.filter((item) => getStockStatus(item) !== "in_stock");
-  const pendingLeave = leaveRequests.filter((request) => request.status === "pending");
-  const missingPayslips = activeStaff.filter(
-    (employee) => !payslips.some((slip) => slip.employeeId === employee.id && slip.period === period)
-  );
-  const payrollRun = payrollRuns.find((run) => run.period === period);
-
-  const attention = [
-    floor.length
-      ? {
-          href: "/dashboard/orders",
-          title:
-            locale === "fr"
-              ? `${floor.length} commande${floor.length > 1 ? "s" : ""} encore en salle`
-              : locale === "mfe"
-                ? `${floor.length} komann ankor lor sal`
-                : `${floor.length} order${floor.length === 1 ? "" : "s"} still on the floor`,
-          detail: `${formatMUR(floor.reduce((sum, order) => sum + orderTotal(order), 0))} ${t("open or being prepared")}`,
-          action: "See orders",
-        }
-      : null,
-    stockAlerts.length
-      ? {
-          href: "/dashboard/inventory",
-          title:
-            locale === "fr"
-              ? `${stockAlerts.length} ingrédient${stockAlerts.length > 1 ? "s" : ""} au minimum ou en dessous`
-              : locale === "mfe"
-                ? `${stockAlerts.length} engredian lor ouswa anba minimem`
-                : `${stockAlerts.length} ingredient${stockAlerts.length === 1 ? "" : "s"} at or below minimum`,
-          detail: "Restock before service runs short",
-          action: "See inventory",
-        }
-      : null,
-    pendingLeave.length
-      ? {
-          href: "/dashboard/payroll/leave",
-          title:
-            locale === "fr"
-              ? `${pendingLeave.length} demande${pendingLeave.length > 1 ? "s" : ""} de congé en attente`
-              : locale === "mfe"
-                ? `${pendingLeave.length} demann konze pe atann`
-                : `${pendingLeave.length} leave request${pendingLeave.length === 1 ? "" : "s"} waiting`,
-          detail: "Approve or decline before the roster is set",
-          action: "See leave",
-        }
-      : null,
-    missingPayslips.length
-      ? {
-          href: "/dashboard/payroll/run",
-          title:
-            locale === "fr"
-              ? `Les fiches de ${monthLabel} ne sont pas prêtes`
-              : locale === "mfe"
-                ? `Bilten ${monthLabel} pa pare`
-                : `${monthLabel} payslips are not ready`,
-          detail:
-            locale === "fr"
-              ? `${missingPayslips.length} employé${missingPayslips.length > 1 ? "s" : ""} actif${missingPayslips.length > 1 ? "s" : ""} sans fiche`
-              : locale === "mfe"
-                ? `${missingPayslips.length} anplwaye aktif bizwin ankor enn bilten`
-                : `${missingPayslips.length} active employee${missingPayslips.length === 1 ? "" : "s"} still need a slip`,
-          action: "Pay and file",
-        }
-      : !payrollRun?.journalEntryId
-        ? {
-            href: "/dashboard/payroll/run",
-            title:
-              locale === "fr"
-                ? `La paie de ${monthLabel} n'est pas dans les livres`
-                : locale === "mfe"
-                  ? `Lapey ${monthLabel} pa dan liv`
-                  : `${monthLabel} payroll is not in the books`,
-            detail: "Post the wage bill before you pay or file",
-            action: "Pay and file",
-          }
-        : !payrollRun.paymentJournalId
-          ? {
-              href: "/dashboard/payroll/run",
-              title:
-                locale === "fr"
-                  ? `Les salaires de ${monthLabel} ne sont pas payés`
-                  : locale === "mfe"
-                    ? `Saler ${monthLabel} pa ankor pey`
-                    : `${monthLabel} salaries are not paid`,
-              detail: "Download the bank file and record the payment",
-              action: "Pay and file",
-            }
-          : !payrollRun.filedOn
-            ? {
-                href: "/dashboard/payroll/run",
-                title:
-                  locale === "fr"
-                    ? `La déclaration MRA de ${monthLabel} n'est pas faite`
-                    : locale === "mfe"
-                      ? `Deklarasyon MRA ${monthLabel} pa ankor fer`
-                      : `${monthLabel} return is not filed with the MRA`,
-                detail: "Download the return and mark it filed",
-                action: "Pay and file",
-              }
-            : !payrollRun.remittanceJournalId
-              ? {
-                  href: "/dashboard/payroll/run",
-                  title:
-                    locale === "fr"
-                      ? `PAYE et contributions de ${monthLabel} pas encore versés`
-                      : locale === "mfe"
-                        ? `PAYE ek kontribisyon ${monthLabel} pa ankor vwayaze`
-                        : `${monthLabel} PAYE and contributions are not remitted`,
-                  detail: "Send the statutory amounts from the bank",
-                  action: "Pay and file",
-                }
-              : null,
-  ].filter((item): item is { href: string; title: string; detail: string; action: string } => Boolean(item));
+  const statement = [
+    { label: "Sales", amount: year.sales, tone: "in" as const },
+    { label: "Food bought", amount: -year.food, tone: "out" as const },
+    { label: "Gross", amount: year.sales - year.food, tone: "mid" as const },
+    { label: "Wages in the books", amount: -year.payroll, tone: "out" as const },
+    { label: "Running costs", amount: -year.running, tone: "out" as const },
+    { label: "Depreciation", amount: -year.depreciation, tone: "out" as const },
+    { label: "Left after costs", amount: year.left, tone: "total" as const },
+  ];
 
   return (
     <div className="mx-auto max-w-5xl">
-      <PageHeader
-        title={`${locale === "fr" ? "Bonjour" : locale === "mfe" ? "Bonzour" : "Hello"}, ${session?.name.split(" ")[0] ?? (locale === "en" ? "there" : "")}`}
-        description={
-          locale === "fr"
-            ? `${periodLabel}. Ventes, coûts et caisse, d'après les livres de ce navigateur.`
-            : locale === "mfe"
-              ? `${periodLabel}. Lavant, kou ek kas, depi liv dan sa navigater la.`
-              : `${periodLabel}. Sales, costs and cash from the books in this browser.`
-        }
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Sales"
-          value={formatMUR(sales)}
-          hint={quietMonth ? "No tickets this month, so this is the year" : "Tickets that were not cancelled"}
-          icon={TrendingUp}
-        />
-        <StatCard
-          title="Left after costs"
-          value={formatMUR(left)}
-          hint="Sales, less food, wages, running costs and depreciation"
-          icon={Wallet}
-          tone={left < 0 ? "red" : "green"}
-        />
-        <StatCard title="Cash and bank" value={formatMUR(money)} hint="What the cashbook currently holds" icon={Banknote} />
-        <StatCard
-          title="Team"
-          value={activeStaff.length}
-          hint={
-            locale === "fr"
-              ? `${formatMUR(wageBill)} de salaires de base ce mois`
-              : locale === "mfe"
-                ? `${formatMUR(wageBill)} saler baz sa mwa`
-                : `${formatMUR(wageBill)} basic salaries this month`
-          }
-          icon={Users}
-          tone="slate"
-        />
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          {hello}
+          {firstName ? `, ${firstName}` : ""}
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">{yearLabel}</p>
       </div>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-semibold text-slate-900">{t("Needs a decision")}</h2>
-        {attention.length === 0 ? (
-          <p className="mt-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
-            {t("The floor, the storeroom and payroll are clear for now.")}
-          </p>
-        ) : (
-          <div className="mt-3 divide-y overflow-hidden rounded-xl border border-slate-200 bg-white">
-            {attention.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-slate-50"
-              >
-                <span>
-                  <span className="block text-sm font-medium text-slate-900">{item.title}</span>
-                  <span className="mt-0.5 block text-xs text-slate-500">{t(item.detail)}</span>
-                </span>
-                <span className="shrink-0 text-sm text-blue-700">{t(item.action)}</span>
-              </Link>
+      <section className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{t("How much you took")}</p>
+            <p className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">{formatMUR(year.sales)}</p>
+            <p className="mt-1 text-sm text-slate-500">{yearLabel}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{t("This month")}</p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{formatMUR(month.sales)}</p>
+            <p className="mt-1 text-sm text-slate-500 capitalize">{monthName(today, "MMMM")}</p>
+          </div>
+        </div>
+        {caption ? <p className="mt-4 text-sm text-slate-600">{caption}</p> : null}
+
+        <div className="mt-6 border-t border-slate-100 pt-4">
+          <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">{t("Month by month")}</p>
+          <div className="mt-4 flex items-end gap-2">
+            {months.map((row) => (
+              <div key={row.key} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                <div className="flex h-24 w-full items-end">
+                  <div
+                    className={cn("w-full rounded-sm", row.sales > 0 ? "bg-slate-900" : "bg-slate-200")}
+                    style={{ height: `${row.sales > 0 ? Math.max(8, (row.sales / peak) * 100) : 4}%` }}
+                    title={`${row.name} ${formatMUR(row.sales)}`}
+                  />
+                </div>
+                <span className="text-[11px] text-slate-500 capitalize">{row.short}</span>
+              </div>
             ))}
           </div>
-        )}
+        </div>
       </section>
 
-      <div className="mt-6 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-        <Link href="/dashboard/reports/pnl" className="text-slate-600 hover:text-slate-900">
-          {t("Profit and loss")}
-        </Link>
-        <Link href="/dashboard/orders" className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900">
-          <ClipboardList className="size-3.5" />
-          {t("Orders")}
-        </Link>
-        <Link href="/dashboard/inventory" className="text-slate-600 hover:text-slate-900">
-          {t("Inventory")}
-        </Link>
-        <Link href="/dashboard/payroll/run" className="text-slate-600 hover:text-slate-900">
-          {t("Pay and file")}
-        </Link>
+      <div className="mt-4 grid items-start gap-4 md:grid-cols-3">
+        <section className="rounded-xl border border-slate-200 bg-white p-5 md:col-span-2">
+          <div className="flex items-center justify-between gap-4">
+            <h2 className="text-sm font-semibold text-slate-900">{t("Where the money went")}</h2>
+            <Link href="/dashboard/reports/pnl" className="text-sm text-blue-700">
+              {t("Profit and loss")}
+            </Link>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">{yearLabel}</p>
+          <ul className="mt-4">
+            {statement.map((row) => (
+              <li
+                key={row.label}
+                className={cn(
+                  "flex items-baseline justify-between gap-4 py-2 text-sm",
+                  row.tone === "mid" || row.tone === "total" ? "border-t border-slate-200 font-semibold" : "text-slate-600"
+                )}
+              >
+                <span className={row.tone === "in" || row.tone === "total" ? "text-slate-900" : undefined}>{t(row.label)}</span>
+                <span className={cn("tabular-nums", row.amount < 0 ? "text-red-600" : "text-slate-900")}>{formatMUR(row.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-xl bg-[#0F172A] p-5 text-white">
+          <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">{t("Cash and bank")}</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight">{formatMUR(cashBalance + bankBalance)}</p>
+          <div className="mt-4 space-y-1 text-sm text-slate-300">
+            <p className="flex justify-between gap-4">
+              <span>{t("Cash on hand")}</span>
+              <span className="shrink-0 whitespace-nowrap">{formatMUR(cashBalance)}</span>
+            </p>
+            <p className="flex justify-between gap-4">
+              <span>{t("In the bank")}</span>
+              <span className={cn("shrink-0 whitespace-nowrap", bankBalance < 0 && "text-amber-300")}>{formatMUR(bankBalance)}</span>
+            </p>
+          </div>
+          {wagesOwed > 0 || statutory > 0 ? (
+            <div className="mt-6 border-t border-white/10 pt-4 text-sm">
+              <p className="text-xs font-medium tracking-wide text-slate-400 uppercase">{t("Still to pay")}</p>
+              {wagesOwed > 0 ? (
+                <p className="mt-3 flex justify-between gap-4 text-slate-300">
+                  <span>{t("Wages still to pay")}</span>
+                  <span className="shrink-0 whitespace-nowrap text-white">{formatMUR(wagesOwed)}</span>
+                </p>
+              ) : null}
+              {statutory > 0 ? (
+                <p className="mt-2 flex justify-between gap-4 text-slate-300">
+                  <span>{t("PAYE and contributions")}</span>
+                  <span className="shrink-0 whitespace-nowrap text-white">{formatMUR(statutory)}</span>
+                </p>
+              ) : null}
+              <Link href="/dashboard/payroll/run" className="mt-4 inline-block text-sm text-sky-300">
+                {t("Pay and file")}
+              </Link>
+            </div>
+          ) : null}
+        </section>
       </div>
     </div>
   );

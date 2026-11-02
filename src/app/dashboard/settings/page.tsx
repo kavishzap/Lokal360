@@ -1,11 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Field } from "@/components/shared/form-modal";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -14,9 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslate } from "@/i18n/use-translate";
 import { companyInitials } from "@/lib/company";
-import { DEMO_CREDENTIALS, STORAGE_KEY } from "@/lib/constants";
 import { useAppStore } from "@/store/app-store";
-import { useAuthStore } from "@/store/auth-store";
 
 const schema = z.object({
   name: z.string().trim().min(1, "Company name is required"),
@@ -37,11 +33,8 @@ const schema = z.object({
 type Values = z.infer<typeof schema>;
 
 export default function SettingsPage() {
-  const session = useAuthStore((state) => state.session);
   const company = useAppStore((state) => state.company);
   const updateCompany = useAppStore((state) => state.updateCompany);
-  const resetDemo = useAppStore((state) => state.resetDemo);
-  const [confirmReset, setConfirmReset] = useState(false);
   const { t } = useTranslate();
 
   const form = useForm<Values>({
@@ -81,7 +74,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Settings"
-        description="Company details used on the sidebar and on reports. Everything stays in this browser."
+        description="Company details used on the sidebar and on reports."
       />
 
       <Card className="mb-4">
@@ -159,70 +152,6 @@ export default function SettingsPage() {
           </form>
         </CardContent>
       </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("Signed-in user")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <Row label={t("Name")} value={session?.name ?? "—"} />
-            <Row label={t("Email")} value={session?.email ?? "—"} />
-            <Row label={t("Role")} value={session?.role ? t(session.role) : "—"} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("Demo authentication")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-slate-500">
-              {t("This login is local only. It is not JWT-based and should not be used in production.")}
-            </p>
-            <Row label={t("Email")} value={DEMO_CREDENTIALS.email} />
-            <Row label={t("Password")} value={DEMO_CREDENTIALS.password} />
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>{t("Demo data")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm">
-            <p className="text-slate-500">
-              All changes are saved under the versioned key <code>{STORAGE_KEY}</code>. Resetting
-              restores the original restaurant seed data, including these company details, and cannot be undone.
-            </p>
-            <Button variant="destructive" onClick={() => setConfirmReset(true)}>
-              {t("Reset demo data")}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      <ConfirmDialog
-        open={confirmReset}
-        onOpenChange={setConfirmReset}
-        title="Reset demo data?"
-        description="This replaces all local zones, tables, menu, inventory and company details with the original B42 Bistro seed data."
-        confirmLabel="Reset data"
-        onConfirm={() => {
-          resetDemo();
-          form.reset(useAppStore.getState().company);
-          setConfirmReset(false);
-          toast.success("Demo data restored");
-        }}
-      />
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b py-2 last:border-0">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-medium text-slate-900">{value}</span>
     </div>
   );
 }

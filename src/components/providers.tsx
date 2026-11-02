@@ -10,10 +10,12 @@ import { hydrateUiStore } from "@/store/ui-store";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    useAuthStore.getState().hydrate();
-    useAppStore.getState().hydrate();
-    useLocaleStore.getState().hydrate();
-    hydrateUiStore();
+    void (async () => {
+      await useAuthStore.getState().hydrate();
+      await useAppStore.getState().hydrate();
+      useLocaleStore.getState().hydrate();
+      hydrateUiStore();
+    })();
   }, []);
 
   return (
