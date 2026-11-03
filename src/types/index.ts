@@ -104,11 +104,22 @@ export interface OrderItem {
   unitPrice: number;
 }
 
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
   tableId: string;
   zoneId: string;
+  customerId: string | null;
+  customerName: string;
+  customerPhone: string;
   status: OrderStatus;
   notes: string;
   items: OrderItem[];
@@ -406,6 +417,7 @@ export interface AppData {
   menuItems: MenuItem[];
   inventory: InventoryItem[];
   transactions: InventoryTransaction[];
+  customers: Customer[];
   orders: Order[];
   accounts: Account[];
   journalEntries: JournalEntry[];

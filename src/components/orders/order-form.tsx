@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { phoneKey } from "@/lib/customers";
 import { formatMUR } from "@/lib/format";
 import { ORDER_STATUSES, orderTotal } from "@/lib/orders";
 import { useAppStore } from "@/store/app-store";
@@ -26,6 +27,8 @@ const schema = z.object({
   zoneId: z.string().min(1, "Zone is required"),
   tableId: z.string().min(1, "Table is required"),
   status: z.enum(["open", "preparing", "served", "completed", "cancelled"]),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
   notes: z.string().optional(),
   items: z
     .array(
@@ -74,6 +77,7 @@ function OrderFormInner({
   const tables = useAppStore((state) => state.tables);
   const categories = useAppStore((state) => state.categories);
   const menuItems = useAppStore((state) => state.menuItems);
+  const customers = useAppStore((state) => state.customers);
   const createOrder = useAppStore((state) => state.createOrder);
   const updateOrder = useAppStore((state) => state.updateOrder);
   const [categoryId, setCategoryId] = useState<string | null>("all");
@@ -86,6 +90,8 @@ function OrderFormInner({
       zoneId: "",
       tableId: "",
       status: "open",
+      customerName: "",
+      customerPhone: "",
       notes: "",
       items: [],
     },
@@ -103,6 +109,8 @@ function OrderFormInner({
             zoneId: table?.zoneId ?? order.zoneId,
             tableId: order.tableId,
             status: order.status,
+            customerName: order.customerName ?? "",
+            customerPhone: order.customerPhone ?? "",
             notes: order.notes,
             items: order.items.map((item) => ({
               menuItemId: item.menuItemId,
@@ -116,6 +124,8 @@ function OrderFormInner({
             zoneId: "",
             tableId: "",
             status: "open",
+            customerName: "",
+            customerPhone: "",
             notes: "",
             items: [],
           }
@@ -175,6 +185,8 @@ function OrderFormInner({
     const payload = {
       tableId: values.tableId,
       status: values.status,
+      customerName: values.customerName ?? "",
+      customerPhone: values.customerPhone ?? "",
       notes: values.notes ?? "",
       items: values.items,
     };
@@ -241,6 +253,21 @@ function OrderFormInner({
                   </SelectContent>
                 </Select>
               )}
+            />
+          </Field>
+          <Field label="Customer name">
+            <Input {...form.register("customerName")} placeholder="Asha Boolaky" />
+          </Field>
+          <Field label="Phone number">
+            <Input
+              {...form.register("customerPhone")}
+              placeholder="5712 3456"
+              onBlur={(event) => {
+                const match = customers.find((customer) => phoneKey(customer.phone) === phoneKey(event.target.value));
+                if (match && !(form.getValues("customerName") ?? "").trim()) {
+                  form.setValue("customerName", match.name);
+                }
+              }}
             />
           </Field>
           <Field label="Status">

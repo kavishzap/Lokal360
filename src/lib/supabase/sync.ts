@@ -109,6 +109,7 @@ function sliceForTable(table: string): DataSlice | null {
     menu_item_ingredients: "menu",
     inventory_items: "inventory",
     inventory_transactions: "movements",
+    customers: "customers",
     orders: "orders",
     order_items: "orders",
     accounts: "accounts",
@@ -152,6 +153,8 @@ function sliceValue(slice: DataSlice, data: Partial<AppData>) {
       return data.inventory ?? [];
     case "movements":
       return data.transactions ?? [];
+    case "customers":
+      return data.customers ?? [];
     case "orders":
       return data.orders ?? [];
     case "accounts":
@@ -406,6 +409,16 @@ async function fetchSlice(slice: DataSlice): Promise<Partial<AppData>> {
           })
         ),
       };
+    case "customers":
+      return {
+        customers: (await rows("customers")).map((row) => ({
+          id: text(row.id),
+          name: text(row.name),
+          phone: text(row.phone),
+          createdAt: text(row.created_at),
+          updatedAt: text(row.updated_at),
+        })),
+      };
     case "orders": {
       const [orderRows, orderItemRows] = await Promise.all([rows("orders"), rows("order_items")]);
       const orderItems = new Map<string, Order["items"]>();
@@ -428,6 +441,9 @@ async function fetchSlice(slice: DataSlice): Promise<Partial<AppData>> {
           orderNumber: text(row.order_number),
           tableId: text(row.table_id),
           zoneId: text(row.zone_id),
+          customerId: text(row.customer_id) || null,
+          customerName: text(row.customer_name),
+          customerPhone: text(row.customer_phone),
           status: text(row.status) as OrderStatus,
           notes: text(row.notes),
           items: orderItems.get(text(row.id)) ?? [],
@@ -841,12 +857,25 @@ async function saveAll(data: AppData) {
     }))
   );
   await upsert(
+    "customers",
+    data.customers.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      created_at: row.createdAt,
+      updated_at: row.updatedAt,
+    }))
+  );
+  await upsert(
     "orders",
     data.orders.map((row) => ({
       id: row.id,
       order_number: row.orderNumber,
       table_id: row.tableId,
       zone_id: row.zoneId,
+      customer_id: row.customerId,
+      customer_name: row.customerName ?? "",
+      customer_phone: row.customerPhone ?? "",
       status: row.status,
       notes: row.notes,
       created_at: row.createdAt,
@@ -1118,6 +1147,7 @@ async function saveAll(data: AppData) {
   await retain("attendance_records", data.attendance.map((row) => row.id));
   await retain("payslips", data.payslips.map((row) => row.id));
   await retain("orders", data.orders.map((row) => row.id));
+  await retain("customers", data.customers.map((row) => row.id));
   await retain("payroll_runs", data.payrollRuns.map((row) => row.id));
   await retain("purchases", data.purchases.map((row) => row.id));
   await retain("expenses", data.expenses.map((row) => row.id));

@@ -8,7 +8,7 @@
 --   Categories, Units             menu_categories, measurement_units
 --   Ingredients, Menu items       ingredients, menu_items, menu_item_ingredients
 --   Inventory, Balance inventory  inventory_items, inventory_transactions
---   Orders                        orders, order_items
+--   Customers, Orders             customers, orders, order_items
 --   Purchases, Expenses, Assets   purchases, expenses, fixed_assets + their lines
 --   Chart, Journal, Ledger,       accounts, journal_entries, journal_lines
 --   Cashbook, Reports
@@ -290,14 +290,31 @@ create table public.inventory_transactions (
 );
 
 -- ---------------------------------------------------------------------------
--- Orders
+-- Customers and orders
+-- name on an order is the French dish name already stored on order_items.
+-- customer_name and customer_phone are the guest on that ticket.
+-- customers.phone is unique for the restaurant, so the same number is one person.
 -- ---------------------------------------------------------------------------
+
+create table public.customers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null default '',
+  phone text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index customers_phone_unique
+  on public.customers (regexp_replace(lower(btrim(phone)), '[[:space:]().-]', '', 'g'));
 
 create table public.orders (
   id uuid primary key default gen_random_uuid(),
   order_number text not null unique,
   table_id uuid not null references public.restaurant_tables (id) on delete restrict,
   zone_id uuid not null references public.zones (id) on delete restrict,
+  customer_id uuid references public.customers (id) on delete set null,
+  customer_name text not null default '',
+  customer_phone text not null default '',
   status public.order_status not null default 'open',
   notes text not null default '',
   created_at timestamptz not null default now(),
@@ -575,7 +592,7 @@ declare
 begin
   foreach t in array array[
     'zones', 'restaurant_tables', 'menu_categories', 'measurement_units', 'ingredients',
-    'menu_items', 'orders', 'accounts', 'purchases', 'expenses', 'fixed_assets',
+    'menu_items', 'customers', 'orders', 'accounts', 'purchases', 'expenses', 'fixed_assets',
     'employees', 'payroll_runs', 'company', 'payroll_policy'
   ]
   loop
@@ -656,7 +673,7 @@ begin
   foreach t in array array[
     'profiles', 'company', 'payroll_policy', 'zones', 'restaurant_tables', 'menu_categories',
     'measurement_units', 'ingredients', 'menu_items', 'menu_item_ingredients', 'inventory_items',
-    'inventory_transactions', 'orders', 'order_items', 'accounts', 'journal_entries', 'journal_lines',
+    'inventory_transactions', 'customers', 'orders', 'order_items', 'accounts', 'journal_entries', 'journal_lines',
     'purchases', 'purchase_lines', 'expenses', 'expense_lines', 'fixed_assets', 'employees',
     'public_holidays', 'leave_requests', 'attendance_records', 'payslips', 'payroll_runs'
   ]

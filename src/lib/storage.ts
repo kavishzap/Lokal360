@@ -51,6 +51,7 @@ export function emptyData(): AppData {
     menuItems: [],
     inventory: [],
     transactions: [],
+    customers: [],
     orders: [],
     accounts: [],
     journalEntries: [],
@@ -113,7 +114,15 @@ function migrate(parsed: Partial<AppData> & { ingredients?: LegacyIngredient[] }
     menuItems: parsed.menuItems ?? [],
     inventory: parsed.inventory ?? [],
     transactions: parsed.transactions ?? [],
-    orders: parsed.orders ?? createSampleOrders(parsed.tables ?? [], parsed.menuItems ?? []),
+    customers: parsed.customers ?? [],
+    orders: (parsed.orders ?? createSampleOrders(parsed.tables ?? [], parsed.menuItems ?? [])).map(
+      (order) => ({
+        ...order,
+        customerId: order.customerId ?? null,
+        customerName: order.customerName ?? "",
+        customerPhone: order.customerPhone ?? "",
+      })
+    ),
     accounts: ensureSystemAccounts(
       parsed.accounts?.length ? parsed.accounts : accounting.accounts
     ),

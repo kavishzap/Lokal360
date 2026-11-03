@@ -209,6 +209,8 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       tableId: table.id!,
       status: "open",
       notes: "",
+      customerName: "",
+      customerPhone: "",
       items: [
         {
           menuItemId: item.id!,
@@ -454,6 +456,8 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       tableId: table.id!,
       status: "preparing",
       notes: "",
+      customerName: "",
+      customerPhone: "",
       items: [
         {
           menuItemId: item.id!,

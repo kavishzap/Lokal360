@@ -14,6 +14,7 @@ import type {
   MenuCategory,
   MenuItem,
   Order,
+  Customer,
   Purchase,
   RestaurantTable,
   Zone,
@@ -700,7 +701,30 @@ function makeTransactions(inventory: InventoryItem[]): InventoryTransaction[] {
   ];
 }
 
-export function createSampleOrders(tables: RestaurantTable[], menuItems: MenuItem[]): Order[] {
+export function makeCustomers(): Customer[] {
+  return [
+    {
+      id: id("bbbbbbb1", 1),
+      name: "Asha Boolaky",
+      phone: "+23057120001",
+      createdAt: created(18, 11),
+      updatedAt: created(21, 12),
+    },
+    {
+      id: id("bbbbbbb1", 2),
+      name: "Nadia Payen",
+      phone: "+23057120002",
+      createdAt: created(19, 15),
+      updatedAt: created(20, 19),
+    },
+  ];
+}
+
+export function createSampleOrders(
+  tables: RestaurantTable[],
+  menuItems: MenuItem[],
+  customers: Customer[] = makeCustomers()
+): Order[] {
   const byTable = (name: string) => tables.find((table) => table.name === name);
   const byMenu = (name: string) => menuItems.find((item) => item.name === name);
   const table01 = byTable("Table 01");
@@ -740,6 +764,9 @@ export function createSampleOrders(tables: RestaurantTable[], menuItems: MenuIte
       orderNumber: "ORD-1001",
       tableId: table01.id,
       zoneId: table01.zoneId,
+      customerId: customers[0]?.id ?? null,
+      customerName: customers[0]?.name ?? "",
+      customerPhone: customers[0]?.phone ?? "",
       status: "preparing",
       notes: "No onions on the burger.",
       items: [line(chickenBurger, 2, 1), line(juice, 2, 2)],
@@ -751,6 +778,9 @@ export function createSampleOrders(tables: RestaurantTable[], menuItems: MenuIte
       orderNumber: "ORD-1002",
       tableId: table07.id,
       zoneId: table07.zoneId,
+      customerId: null,
+      customerName: "",
+      customerPhone: "",
       status: "open",
       notes: "",
       items: [line(wings, 1, 3), line(salad, 1, 4), line(pizza, 1, 5)],
@@ -762,6 +792,9 @@ export function createSampleOrders(tables: RestaurantTable[], menuItems: MenuIte
       orderNumber: "ORD-1003",
       tableId: vip01.id,
       zoneId: vip01.zoneId,
+      customerId: customers[1]?.id ?? null,
+      customerName: customers[1]?.name ?? "",
+      customerPhone: customers[1]?.phone ?? "",
       status: "served",
       notes: "VIP tasting table.",
       items: [line(steak, 2, 6), line(coffee, 2, 7)],
@@ -773,6 +806,9 @@ export function createSampleOrders(tables: RestaurantTable[], menuItems: MenuIte
       orderNumber: "ORD-1004",
       tableId: table02.id,
       zoneId: table02.zoneId,
+      customerId: null,
+      customerName: "",
+      customerPhone: "",
       status: "completed",
       notes: "",
       items: [line(beefBurger, 1, 8), line(juice, 1, 9)],
@@ -1109,7 +1145,8 @@ export function createSeedData(): AppData {
   const menuItems = makeMenuItems();
   const inventory = makeInventory(ingredients);
   const transactions = makeTransactions(inventory);
-  const orders = createSampleOrders(tables, menuItems);
+  const customers = makeCustomers();
+  const orders = createSampleOrders(tables, menuItems, customers);
   const accounting = makeSampleAccounting(ingredients);
   const payroll = makeSamplePayroll();
 
@@ -1122,6 +1159,7 @@ export function createSeedData(): AppData {
     menuItems,
     inventory,
     transactions,
+    customers,
     orders,
     ...accounting,
     ...payroll,

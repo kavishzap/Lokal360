@@ -11,6 +11,7 @@ import {
 import { pendingDepreciation } from "@/lib/assets";
 import { defaultCompany } from "@/lib/company";
 import { buildPayslip, defaultPayrollPolicy, employeeName, leaveDaysInRange, payrollTotals, periodBounds } from "@/lib/payroll";
+import { phoneDigits, phoneKey } from "@/lib/customers";
 import { createId, nowIso } from "@/lib/format";
 import { nextOrderNumber } from "@/lib/orders";
 import { emptyData, loadAppData, resetAppData, saveAppData } from "@/lib/storage";
@@ -39,6 +40,7 @@ import type {
   InventoryItem,
   InventoryTransaction,
   InventoryTransactionType,
+  Customer,
   JournalEntry,
   JournalLine,
   MenuCategory,
@@ -67,8 +69,11 @@ type OrderInput = {
   tableId: string;
   status: OrderStatus;
   notes: string;
+  customerName: string;
+  customerPhone: string;
   items: Omit<OrderItem, "id">[];
 };
+type CustomerInput = Pick<Customer, "name" | "phone">;
 type InventorySetupInput = {
   ingredientId: string;
   currentStock: number;
@@ -181,6 +186,9 @@ interface AppState extends AppData {
     date?: string
   ) => ActionResult;
   deleteInventory: (id: string) => ActionResult;
+  createCustomer: (input: CustomerInput) => ActionResult;
+  updateCustomer: (id: string, input: CustomerInput) => ActionResult;
+  deleteCustomer: (id: string) => ActionResult;
   createOrder: (input: OrderInput) => ActionResult;
   updateOrder: (id: string, input: OrderInput) => ActionResult;
   deleteOrder: (id: string) => ActionResult;
@@ -247,6 +255,7 @@ function snapshot(state: AppState): AppData {
     menuItems: state.menuItems,
     inventory: state.inventory,
     transactions: state.transactions,
+    customers: state.customers ?? [],
     orders: state.orders,
     accounts: state.accounts,
     journalEntries: state.journalEntries,
@@ -261,6 +270,91 @@ function snapshot(state: AppState): AppData {
     payrollRuns: state.payrollRuns ?? [],
     payrollPolicy: state.payrollPolicy ?? defaultPayrollPolicy(),
     company: state.company ?? defaultCompany(),
+  };
+}
+
+function customerFrom(input: CustomerInput, existing?: Customer): { customer: Customer } | { error: string } {
+  const phone = phoneKey(input.phone);
+  if (phoneDigits(phone).length < 7) return { error: "Enter a valid phone number." };
+  const now = nowIso();
+  return {
+    customer: {
+      id: existing?.id ?? createId(),
+      name: input.name.trim(),
+      phone,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    },
+  };
+}
+
+function phoneTaken(customers: Customer[], phone: string, exceptId?: string) {
+  return customers.some((customer) => customer.id !== exceptId && phoneKey(customer.phone) === phone);
+}
+
+function saveCustomer(customers: Customer[], input: CustomerInput, id?: string) {
+  const saved = customerFrom(input, id ? customers.find((customer) => customer.id === id) : undefined);
+  if ("error" in saved) return saved;
+  if (phoneTaken(customers, saved.customer.phone, id)) {
+    return { error: "A customer with this phone number already exists." };
+  }
+  return saved;
+}
+
+function stampCustomerOrders(orders: Order[], customerId: string | null, name: string, phone: string) {
+  if (!customerId) return orders;
+  return orders.map((order) =>
+    order.customerId === customerId ? { ...order, customerName: name, customerPhone: phone } : order
+  );
+}
+
+function linkCustomer(customers: Customer[], name: string, phone: string) {
+  const customerName = name.trim();
+  const typed = phone.trim();
+  if (!typed) {
+    return { customers, customerId: null as string | null, customerName, customerPhone: "", error: undefined };
+  }
+  const key = phoneKey(typed);
+  if (phoneDigits(key).length < 7) {
+    return {
+      customers,
+      customerId: null as string | null,
+      customerName,
+      customerPhone: "",
+      error: "Enter a valid phone number.",
+    };
+  }
+  const existing = customers.find((customer) => phoneKey(customer.phone) === key);
+  if (existing) {
+    const nextName = customerName || existing.name;
+    const changed = nextName !== existing.name || existing.phone !== key;
+    return {
+      customers: changed
+        ? customers.map((customer) =>
+            customer.id === existing.id
+              ? { ...customer, name: nextName, phone: key, updatedAt: nowIso() }
+              : customer
+          )
+        : customers,
+      customerId: existing.id,
+      customerName: nextName,
+      customerPhone: key,
+      error: undefined,
+    };
+  }
+  const created: Customer = {
+    id: createId(),
+    name: customerName,
+    phone: key,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  return {
+    customers: [created, ...customers],
+    customerId: created.id,
+    customerName,
+    customerPhone: key,
+    error: undefined,
   };
 }
 
@@ -877,6 +971,51 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(next);
     return { ok: true };
   },
+  createCustomer: (input) => {
+    const state = get();
+    const saved = saveCustomer(state.customers, input);
+    if ("error" in saved) return { ok: false, error: saved.error };
+    const next = { ...snapshot(state), customers: [saved.customer, ...state.customers] };
+    persist(next);
+    set(next);
+    return { ok: true, id: saved.customer.id };
+  },
+  updateCustomer: (id, input) => {
+    const state = get();
+    if (!state.customers.some((customer) => customer.id === id)) {
+      return { ok: false, error: "Customer not found." };
+    }
+    const saved = saveCustomer(state.customers, input, id);
+    if ("error" in saved) return { ok: false, error: saved.error };
+    const next = {
+      ...snapshot(state),
+      customers: state.customers.map((customer) => (customer.id === id ? saved.customer : customer)),
+      orders: state.orders.map((order) =>
+        order.customerId === id
+          ? { ...order, customerName: saved.customer.name, customerPhone: saved.customer.phone }
+          : order
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteCustomer: (id) => {
+    const state = get();
+    if (state.orders.some((order) => order.customerId === id)) {
+      return {
+        ok: false,
+        error: "This customer cannot be deleted because they are on an order.",
+      };
+    }
+    const next = {
+      ...snapshot(state),
+      customers: state.customers.filter((customer) => customer.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
   createOrder: (input) => {
     const state = get();
     const table = state.tables.find((row) => row.id === input.tableId);
@@ -885,18 +1024,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (input.items.some((item) => item.quantity < 1)) {
       return { ok: false, error: "Item quantities must be at least 1." };
     }
+    const linked = linkCustomer(state.customers, input.customerName, input.customerPhone);
+    if (linked.error) return { ok: false, error: linked.error };
     const order: Order = {
       id: createId(),
       orderNumber: nextOrderNumber(state.orders),
       tableId: table.id,
       zoneId: table.zoneId,
+      customerId: linked.customerId,
+      customerName: linked.customerName,
+      customerPhone: linked.customerPhone,
       status: input.status,
       notes: input.notes.trim(),
       items: input.items.map((item) => ({ ...item, id: createId() })),
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
-    const next = { ...snapshot(state), orders: [order, ...state.orders] };
+    const next = {
+      ...snapshot(state),
+      customers: linked.customers,
+      orders: stampCustomerOrders([order, ...state.orders], linked.customerId, linked.customerName, linked.customerPhone),
+    };
     persist(next);
     set(next);
     return { ok: true, id: order.id };
@@ -909,14 +1057,21 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (input.items.some((item) => item.quantity < 1)) {
       return { ok: false, error: "Item quantities must be at least 1." };
     }
+    const linked = linkCustomer(state.customers, input.customerName, input.customerPhone);
+    if (linked.error) return { ok: false, error: linked.error };
     const next = {
       ...snapshot(state),
-      orders: state.orders.map((order) =>
+      customers: linked.customers,
+      orders: stampCustomerOrders(
+        state.orders.map((order) =>
         order.id === id
           ? {
               ...order,
               tableId: table.id,
               zoneId: table.zoneId,
+              customerId: linked.customerId,
+              customerName: linked.customerName,
+              customerPhone: linked.customerPhone,
               status: input.status,
               notes: input.notes.trim(),
               items: input.items.map((item) => ({
@@ -926,6 +1081,10 @@ export const useAppStore = create<AppState>((set, get) => ({
               updatedAt: nowIso(),
             }
           : order
+        ),
+        linked.customerId,
+        linked.customerName,
+        linked.customerPhone
       ),
     };
     persist(next);

@@ -9,6 +9,7 @@ export type CreateTarget =
   | "unit"
   | "ingredient"
   | "menu-item"
+  | "customer"
   | "order"
   | "inventory"
   | "purchase"

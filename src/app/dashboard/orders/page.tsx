@@ -60,6 +60,8 @@ export default function OrdersPage() {
           order.orderNumber.toLowerCase().includes(query.toLowerCase()) ||
           (table?.name.toLowerCase().includes(query.toLowerCase()) ?? false) ||
           (zone?.name.toLowerCase().includes(query.toLowerCase()) ?? false) ||
+          (order.customerName ?? "").toLowerCase().includes(query.toLowerCase()) ||
+          (order.customerPhone ?? "").toLowerCase().includes(query.toLowerCase()) ||
           order.items.some((item) => item.name.toLowerCase().includes(query.toLowerCase()));
         const matchesZone = zoneId === "all" || zoneId == null || order.zoneId === zoneId;
         const matchesTable = tableId === "all" || tableId == null || order.tableId === tableId;
@@ -84,6 +86,18 @@ export default function OrdersPage() {
     {
       header: "Table",
       cell: (order) => tables.find((table) => table.id === order.tableId)?.name ?? "—",
+    },
+    {
+      header: "Customer",
+      cell: (order) =>
+        order.customerName || order.customerPhone ? (
+          <div>
+            <p>{order.customerName || "—"}</p>
+            {order.customerPhone ? <p className="text-xs text-slate-500">{order.customerPhone}</p> : null}
+          </div>
+        ) : (
+          "—"
+        ),
     },
     {
       header: "Items",

@@ -10,6 +10,7 @@ export const DATA_SLICES = [
   "menu",
   "inventory",
   "movements",
+  "customers",
   "orders",
   "accounts",
   "journals",
@@ -37,7 +38,10 @@ function routeSlices(pathname: string): DataSlice[] {
   if (under(pathname, "/dashboard/units")) return ["company", "units", "ingredients"];
   if (under(pathname, "/dashboard/ingredients")) return ["company", "ingredients", "units", "menu", "inventory"];
   if (under(pathname, "/dashboard/menu-items")) return ["company", "menu", "categories", "ingredients"];
-  if (under(pathname, "/dashboard/orders")) return ["company", "orders", "tables", "zones", "categories", "menu"];
+  if (under(pathname, "/dashboard/customers")) return ["company", "customers", "orders"];
+  if (under(pathname, "/dashboard/orders")) {
+    return ["company", "orders", "customers", "tables", "zones", "categories", "menu"];
+  }
   if (under(pathname, "/dashboard/inventory")) return ["company", "inventory", "movements", "ingredients", "units"];
   if (under(pathname, "/dashboard/balance-inventory")) {
     return ["company", "orders", "menu", "ingredients", "inventory", "movements", "units"];

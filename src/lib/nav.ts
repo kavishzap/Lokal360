@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Car,
   ClipboardList,
+  Contact,
   Clock,
   FileBarChart,
   Landmark,
@@ -67,6 +68,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/dashboard/units", label: "Units", icon: Ruler },
       { href: "/dashboard/ingredients", label: "Ingredients", icon: Leaf },
       { href: "/dashboard/menu-items", label: "Menu Items", icon: ShoppingBasket },
+      { href: "/dashboard/customers", label: "Customers", icon: Contact },
       { href: "/dashboard/orders", label: "Orders", icon: ClipboardList },
       { href: "/dashboard/inventory", label: "Inventory", icon: Boxes },
       { href: "/dashboard/balance-inventory", label: "Balance Inventory", icon: Scale },
@@ -170,6 +172,14 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
         { label: "Dashboard", href: "/dashboard" },
         { label: "Restaurant" },
         { label: "Menu Items" },
+      ],
+    },
+    "/dashboard/customers": {
+      title: "Customers",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Restaurant" },
+        { label: "Customers" },
       ],
     },
     "/dashboard/orders": {

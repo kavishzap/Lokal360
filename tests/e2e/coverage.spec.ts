@@ -11,6 +11,7 @@ const GUEST_PATHS = [
   "/dashboard/units",
   "/dashboard/ingredients",
   "/dashboard/menu-items",
+  "/dashboard/customers",
   "/dashboard/orders",
   "/dashboard/inventory",
   "/dashboard/balance-inventory",
@@ -235,6 +236,47 @@ test("refuses to delete an ingredient used in a recipe", async ({ page }) => {
   await page.getByRole("row", { name: /Beef Patty/ }).getByRole("button").nth(1).click();
   await page.getByRole("button", { name: "Delete" }).click();
   await expect(page.getByText("This ingredient cannot be deleted because it is used in one or more menu item recipes.")).toBeVisible();
+});
+
+test("creates one customer from an order phone number", async ({ page }) => {
+  await login(page);
+  await openSection(page, "Restaurant Management");
+  await page.getByRole("link", { name: "Orders", exact: true }).click();
+  await page.getByRole("button", { name: "Add order" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByText("Select zone").click();
+  await page.getByRole("option", { name: "Indoor Dining" }).click();
+  await dialog.getByText("Select table").click();
+  await page.getByRole("option", { name: /Table 02/ }).click();
+  await dialog.getByPlaceholder("Asha Boolaky").fill("QA Guest");
+  await dialog.getByPlaceholder("5712 3456").fill("5711 9901");
+  await dialog.getByText("Menu item", { exact: true }).click();
+  await page.getByRole("option", { name: /Chicken Burger/ }).click();
+  await dialog.getByRole("button", { name: "Add", exact: true }).click();
+  await dialog.getByRole("button", { name: "Create order" }).click();
+  await expect(page.getByRole("row", { name: /QA Guest/ })).toBeVisible();
+
+  await page.getByRole("link", { name: "Customers", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Customers" }).first()).toBeVisible();
+  await expect(page.getByRole("row", { name: /QA Guest/ })).toBeVisible();
+  await expect(page.getByRole("row", { name: /57119901/ })).toHaveCount(1);
+
+  await page.getByRole("link", { name: "Orders", exact: true }).click();
+  await page.getByRole("button", { name: "Add order" }).click();
+  await dialog.getByText("Select zone").click();
+  await page.getByRole("option", { name: "Indoor Dining" }).click();
+  await dialog.getByText("Select table").click();
+  await page.getByRole("option", { name: /Table 03/ }).click();
+  await dialog.getByPlaceholder("Asha Boolaky").fill("QA Guest Again");
+  await dialog.getByPlaceholder("5712 3456").fill("57119901");
+  await dialog.getByText("Menu item", { exact: true }).click();
+  await page.getByRole("option", { name: /Chicken Burger/ }).click();
+  await dialog.getByRole("button", { name: "Add", exact: true }).click();
+  await dialog.getByRole("button", { name: "Create order" }).click();
+
+  await page.getByRole("link", { name: "Customers", exact: true }).click();
+  await expect(page.getByRole("row", { name: /57119901/ })).toHaveCount(1);
+  await expect(page.getByRole("row", { name: /QA Guest Again/ })).toBeVisible();
 });
 
 test("rejects an order that has no dishes", async ({ page }) => {
