@@ -25,10 +25,12 @@ export function CategoryForm({
   open,
   onOpenChange,
   category,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   category?: MenuCategory | null;
+  onCreated?: (id: string) => void;
 }) {
   const categories = useAppStore((state) => state.categories);
   const createCategory = useAppStore((state) => state.createCategory);
@@ -73,6 +75,7 @@ export function CategoryForm({
       return;
     }
     toast.success(category ? "Category updated" : "Category created");
+    if (!category && result.id) onCreated?.(result.id);
     onOpenChange(false);
   };
 

@@ -363,9 +363,11 @@ async function fetchSlice(slice: DataSlice): Promise<Partial<AppData>> {
         menuItems: itemRows.map((row) => ({
           id: text(row.id),
           name: text(row.name),
+          nameEn: text(row.name_en),
           description: text(row.description),
           categoryId: text(row.category_id),
           price: num(row.price),
+          manufacturedPrice: num(row.manufactured_price),
           image: text(row.image) || null,
           preparationTime: row.preparation_time == null ? null : num(row.preparation_time),
           isAvailable: Boolean(row.is_available),
@@ -802,9 +804,11 @@ async function saveAll(data: AppData) {
     data.menuItems.map((row) => ({
       id: row.id,
       name: row.name,
+      name_en: row.nameEn ?? "",
       description: row.description,
       category_id: row.categoryId,
       price: row.price,
+      manufactured_price: row.manufacturedPrice ?? 0,
       image: row.image,
       preparation_time: row.preparationTime,
       is_available: row.isAvailable,

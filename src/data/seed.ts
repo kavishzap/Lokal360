@@ -251,7 +251,7 @@ function recipe(
 }
 
 function makeMenuItems(): MenuItem[] {
-  const items: Omit<MenuItem, "id" | "createdAt" | "updatedAt">[] = [
+  const items: Omit<MenuItem, "id" | "createdAt" | "updatedAt" | "nameEn" | "manufacturedPrice">[] = [
     {
       name: "Crispy Chicken Wings",
       description: "Spiced wings with garlic oil and a light salad garnish.",
@@ -576,6 +576,8 @@ function makeMenuItems(): MenuItem[] {
 
   return items.map((item, index) => ({
     ...item,
+    nameEn: item.name,
+    manufacturedPrice: 0,
     id: id("55555555", index + 1),
     createdAt: created(12 + (index % 10), 11),
     updatedAt: created(12 + (index % 10), 11),

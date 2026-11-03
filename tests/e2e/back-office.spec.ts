@@ -182,8 +182,9 @@ test("creates a menu item in a category with an ingredient", async ({ page }) =>
   await page.getByRole("button", { name: "Add menu item" }).click();
   const dialog = page.getByRole("dialog");
   await dialog.getByRole("button", { name: "Create menu item" }).click();
-  await expect(dialog.getByText("Menu item name is required")).toBeVisible();
+  await expect(dialog.getByText("French name is required")).toBeVisible();
 
+  await dialog.getByPlaceholder("Burger de poulet").fill("QA Night Special");
   await dialog.getByPlaceholder("Chicken Burger").fill("QA Night Special");
   await dialog.getByText("Select category").click();
   await page.getByRole("option", { name: "Burgers", exact: true }).click();

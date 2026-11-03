@@ -706,9 +706,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   createMenuItem: (input) => {
     const state = get();
-    if (!input.name.trim()) return { ok: false, error: "Menu item name is required." };
+    if (!input.name.trim()) return { ok: false, error: "French name is required." };
+    if (!(input.nameEn ?? "").trim()) return { ok: false, error: "English name is required." };
     if (!input.categoryId) return { ok: false, error: "Category is required." };
     if (input.price < 0) return { ok: false, error: "Price cannot be negative." };
+    if (!(input.manufacturedPrice >= 0)) {
+      return { ok: false, error: "Manufactured price cannot be negative." };
+    }
     const ids = input.ingredients.map((row) => row.ingredientId);
     if (new Set(ids).size !== ids.length) {
       return { ok: false, error: "Each ingredient can only be selected once." };
@@ -720,7 +724,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...input,
       id: createId(),
       name: input.name.trim(),
+      nameEn: (input.nameEn ?? "").trim(),
       description: input.description.trim(),
+      manufacturedPrice: input.manufacturedPrice,
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
@@ -735,9 +741,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   updateMenuItem: (id, input) => {
     const state = get();
-    if (!input.name.trim()) return { ok: false, error: "Menu item name is required." };
+    if (!input.name.trim()) return { ok: false, error: "French name is required." };
+    if (!(input.nameEn ?? "").trim()) return { ok: false, error: "English name is required." };
     if (!input.categoryId) return { ok: false, error: "Category is required." };
     if (input.price < 0) return { ok: false, error: "Price cannot be negative." };
+    if (!(input.manufacturedPrice >= 0)) {
+      return { ok: false, error: "Manufactured price cannot be negative." };
+    }
     const ids = input.ingredients.map((row) => row.ingredientId);
     if (new Set(ids).size !== ids.length) {
       return { ok: false, error: "Each ingredient can only be selected once." };
@@ -753,7 +763,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               ...item,
               ...input,
               name: input.name.trim(),
+              nameEn: (input.nameEn ?? "").trim(),
               description: input.description.trim(),
+              manufacturedPrice: input.manufacturedPrice,
               updatedAt: nowIso(),
             }
           : item

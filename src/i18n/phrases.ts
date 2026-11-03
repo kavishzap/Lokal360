@@ -456,6 +456,11 @@ const fr: Record<string, string> = {
   "Delete menu item?": "Supprimer l'article ?",
   "Menu items": "Articles du menu",
   "Add menu item": "Ajouter un article",
+  "French name": "Nom français",
+  "English name": "Nom anglais",
+  "Manufactured price (MUR)": "Prix fabriqué (MUR)",
+  "Selling price (MUR)": "Prix de vente (MUR)",
+  Manufactured: "Fabriqué",
   "Sellable dishes with recipes, category and Mauritian Rupee pricing.":
     "Plats à vendre, avec recette, catégorie et prix en roupies.",
   "Create dishes with a category, selling price and ingredient recipe.":
@@ -928,6 +933,11 @@ const mfe: Record<string, string> = {
   "Delete menu item?": "Efase plad ?",
   "Menu items": "Plad menu",
   "Add menu item": "Azout plad",
+  "French name": "Non franse",
+  "English name": "Non angle",
+  "Manufactured price (MUR)": "Pri fabrike (MUR)",
+  "Selling price (MUR)": "Pri vann (MUR)",
+  Manufactured: "Fabrike",
   "Sellable dishes with recipes, category and Mauritian Rupee pricing.":
     "Plad pou vann, avek resèt, kategori ek pri an roupi.",
   "Create dishes with a category, selling price and ingredient recipe.":

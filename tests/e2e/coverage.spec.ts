@@ -548,6 +548,26 @@ test("guards holidays and can restore the legal rates", async ({ page }) => {
   await expect(page.getByText("Restored Mauritian default rates. Save to keep them.")).toBeVisible();
 });
 
+test("creates a category from the menu page and from the dish form", async ({ page }) => {
+  await login(page);
+  await openSection(page, "Restaurant Management");
+  await page.getByRole("link", { name: "Menu Items", exact: true }).click();
+
+  await page.getByRole("button", { name: "Add category" }).click();
+  const categoryDialog = page.getByRole("dialog");
+  await categoryDialog.getByPlaceholder("Burgers").fill("QA Page Category");
+  await categoryDialog.getByRole("button", { name: "Create category" }).click();
+  await expect(page.getByText("Category created")).toBeVisible();
+
+  await page.getByRole("button", { name: "Add menu item" }).click();
+  const dishDialog = page.getByRole("dialog", { name: "Add menu item" });
+  await dishDialog.getByRole("button", { name: "Add category" }).click();
+  const nested = page.getByRole("dialog", { name: "Add category" });
+  await nested.getByPlaceholder("Burgers").fill("QA Dish Category");
+  await nested.getByRole("button", { name: "Create category" }).click();
+  await expect(dishDialog.getByRole("combobox").first()).toContainText("QA Dish Category");
+});
+
 test("sends a staff member away from AI Analytics", async ({ page }) => {
   await page.goto("/login");
   await page.locator('input[type="email"]').fill("meera.ramdoyal@b42.mu");

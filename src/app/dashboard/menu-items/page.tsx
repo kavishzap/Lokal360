@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { SearchInput } from "@/components/shared/search-input";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { CategoryForm } from "@/components/categories/category-form";
 import { MenuItemCard } from "@/components/menu-items/menu-item-card";
 import { MenuItemForm } from "@/components/menu-items/menu-item-form";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCreateRequest } from "@/hooks/use-create-request";
+import { useTranslate } from "@/i18n/use-translate";
 import { formatMUR } from "@/lib/format";
 import { useAppStore } from "@/store/app-store";
 import type { MenuItem } from "@/types";
@@ -37,6 +39,8 @@ export default function MenuItemsPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<MenuItem | null>(null);
   const [deleting, setDeleting] = useState<MenuItem | null>(null);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const { t } = useTranslate();
 
   useCreateRequest("menu-item", () => {
     setEditing(null);
@@ -48,6 +52,7 @@ export default function MenuItemsPage() {
       const matchesQuery =
         !query ||
         item.name.toLowerCase().includes(query.toLowerCase()) ||
+        (item.nameEn ?? "").toLowerCase().includes(query.toLowerCase()) ||
         item.description.toLowerCase().includes(query.toLowerCase());
       const matchesCategory =
         categoryId === "all" || categoryId == null || item.categoryId === categoryId;
@@ -72,6 +77,9 @@ export default function MenuItemsPage() {
           </div>
           <div>
             <p className="font-medium">{item.name}</p>
+            {item.nameEn && item.nameEn !== item.name ? (
+              <p className="text-xs text-slate-500">{item.nameEn}</p>
+            ) : null}
             <p className="text-xs text-slate-500">
               {categories.find((category) => category.id === item.categoryId)?.name}
             </p>
@@ -80,6 +88,7 @@ export default function MenuItemsPage() {
       ),
     },
     { header: "Price", cell: (item) => formatMUR(item.price) },
+    { header: t("Manufactured"), cell: (item) => formatMUR(item.manufacturedPrice ?? 0) },
     { header: "Ingredients", cell: (item) => item.ingredients.length },
     {
       header: "Available",
@@ -128,6 +137,9 @@ export default function MenuItemsPage() {
           setOpen(true);
         }}
       >
+        <Button variant="outline" className="h-9 px-3" onClick={() => setCategoryOpen(true)}>
+          {t("Add category")}
+        </Button>
         <div className="flex rounded-lg border bg-white p-0.5">
           <Button
             variant={view === "grid" ? "secondary" : "ghost"}
@@ -204,6 +216,7 @@ export default function MenuItemsPage() {
         </div>
       )}
 
+      <CategoryForm open={categoryOpen} onOpenChange={setCategoryOpen} />
       <MenuItemForm
         open={open}
         onOpenChange={(next) => {

@@ -18,9 +18,11 @@ function resetStores() {
 function menuInput(categoryId: string, overrides: Partial<MenuInput> = {}): MenuInput {
   return {
     name: "QA Burger",
+    nameEn: "QA Burger",
     description: "Test dish",
     categoryId,
     price: 250,
+    manufacturedPrice: 80,
     image: null,
     preparationTime: 10,
     isAvailable: true,

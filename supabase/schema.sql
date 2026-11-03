@@ -242,9 +242,11 @@ create table public.ingredients (
 create table public.menu_items (
   id uuid primary key default gen_random_uuid(),
   name text not null,
+  name_en text not null default '',
   description text not null default '',
   category_id uuid not null references public.menu_categories (id) on delete restrict,
   price numeric(14,2) not null check (price >= 0),
+  manufactured_price numeric(14,2) not null default 0 check (manufactured_price >= 0),
   image text,
   preparation_time int check (preparation_time is null or preparation_time >= 0),
   is_available boolean not null default true,
@@ -254,6 +256,7 @@ create table public.menu_items (
 );
 
 create unique index menu_items_name_unique on public.menu_items (lower(btrim(name)));
+create unique index menu_items_name_en_unique on public.menu_items (lower(btrim(name_en))) where btrim(name_en) <> '';
 
 create table public.menu_item_ingredients (
   menu_item_id uuid not null references public.menu_items (id) on delete cascade,

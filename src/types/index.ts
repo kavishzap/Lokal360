@@ -59,9 +59,11 @@ export interface MenuItemIngredient {
 export interface MenuItem {
   id: string;
   name: string;
+  nameEn: string;
   description: string;
   categoryId: string;
   price: number;
+  manufacturedPrice: number;
   image: string | null;
   preparationTime: number | null;
   isAvailable: boolean;
