@@ -5,9 +5,14 @@ import { getStockStatus, inventoryValue } from "@/lib/inventory";
 import { emptyData, loadAppData } from "@/lib/storage";
 import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
-import type { MenuItem } from "@/types";
+import type { ActionResult, MenuItem } from "@/types";
 
 type MenuInput = Omit<MenuItem, "id" | "createdAt" | "updatedAt">;
+
+function mustId(result: ActionResult) {
+  if (!result.ok || !result.id) throw new Error(result.ok ? "Expected a saved id" : result.error);
+  return result.id;
+}
 
 function resetStores() {
   localStorage.clear();
@@ -185,15 +190,15 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     });
     expect(moved.ok).toBe(false);
 
-    expect(useAppStore.getState().deleteTable(created.id!).ok).toBe(true);
-    expect(useAppStore.getState().tables.some((table) => table.id === created.id)).toBe(false);
+    expect(useAppStore.getState().deleteTable(mustId(created)).ok).toBe(true);
+    expect(useAppStore.getState().tables.some((table) => table.id === mustId(created))).toBe(false);
   });
 
   it("blocks table deletion while an order still references the table", () => {
     const zone = useAppStore.getState().createZone({ name: "Floor", description: "", isActive: true });
     const table = useAppStore.getState().createTable({
       name: "T9",
-      zoneId: zone.id!,
+      zoneId: mustId(zone),
       capacity: 2,
       isActive: true,
     });
@@ -204,17 +209,17 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       displayOrder: 1,
       isActive: true,
     });
-    const item = useAppStore.getState().createMenuItem(menuInput(category.id!, { name: "Steak" }));
+    const item = useAppStore.getState().createMenuItem(menuInput(mustId(category), { name: "Steak" }));
     const order = useAppStore.getState().createOrder({
-      tableId: table.id!,
+      tableId: mustId(table),
       status: "open",
       notes: "",
       customerName: "",
       customerPhone: "",
       items: [
         {
-          menuItemId: item.id!,
-          categoryId: category.id!,
+          menuItemId: mustId(item),
+          categoryId: mustId(category),
           name: "Steak",
           quantity: 1,
           unitPrice: 250,
@@ -222,7 +227,7 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       ],
     });
     expect(order.ok).toBe(true);
-    const removed = useAppStore.getState().deleteTable(table.id!);
+    const removed = useAppStore.getState().deleteTable(mustId(table));
     expect(removed.ok).toBe(false);
     if (!removed.ok) expect(removed.error).toMatch(/order/i);
   });
@@ -256,7 +261,7 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     ).toBe(false);
 
     expect(
-      useAppStore.getState().updateCategory(second.id!, {
+      useAppStore.getState().updateCategory(mustId(second), {
         name: "Main courses",
         description: "Hot food",
         image: null,
@@ -265,11 +270,11 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       }).ok
     ).toBe(true);
 
-    expect(useAppStore.getState().reorderCategory(second.id!, "up").ok).toBe(true);
+    expect(useAppStore.getState().reorderCategory(mustId(second), "up").ok).toBe(true);
     const ordered = [...useAppStore.getState().categories].sort((a, b) => a.displayOrder - b.displayOrder);
     expect(ordered.map((category) => category.name)).toEqual(["Main courses", "Starters"]);
 
-    expect(useAppStore.getState().deleteCategory(first.id!).ok).toBe(true);
+    expect(useAppStore.getState().deleteCategory(mustId(first)).ok).toBe(true);
     expect(useAppStore.getState().categories).toHaveLength(1);
   });
 
@@ -281,8 +286,8 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       displayOrder: 1,
       isActive: true,
     });
-    useAppStore.getState().createMenuItem(menuInput(category.id!, { name: "Cake" }));
-    const removed = useAppStore.getState().deleteCategory(category.id!);
+    useAppStore.getState().createMenuItem(menuInput(mustId(category), { name: "Cake" }));
+    const removed = useAppStore.getState().deleteCategory(mustId(category));
     expect(removed.ok).toBe(false);
     if (!removed.ok) expect(removed.error).toMatch(/menu item/i);
   });
@@ -303,7 +308,7 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       useAppStore.getState().createIngredient({
         name: "   ",
         description: "",
-        unitId: unit.id!,
+        unitId: mustId(unit),
         isActive: true,
       }).ok
     ).toBe(false);
@@ -311,7 +316,7 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     const created = useAppStore.getState().createIngredient({
       name: "  Sea Salt  ",
       description: "Flakes",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
     expect(created.ok).toBe(true);
@@ -320,20 +325,20 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     const duplicate = useAppStore.getState().createIngredient({
       name: "sea salt",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
     expect(duplicate.ok).toBe(false);
 
     expect(
-      useAppStore.getState().updateIngredient(created.id!, {
+      useAppStore.getState().updateIngredient(mustId(created), {
         name: "Flake salt",
         description: "",
-        unitId: unit.id!,
+        unitId: mustId(unit),
         isActive: false,
       }).ok
     ).toBe(true);
-    expect(useAppStore.getState().deleteIngredient(created.id!).ok).toBe(true);
+    expect(useAppStore.getState().deleteIngredient(mustId(created)).ok).toBe(true);
     expect(useAppStore.getState().ingredients).toHaveLength(0);
   });
 
@@ -342,7 +347,7 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     const ingredient = useAppStore.getState().createIngredient({
       name: "Bun",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
     const category = useAppStore.getState().createCategory({
@@ -353,21 +358,21 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       isActive: true,
     });
     useAppStore.getState().createMenuItem(
-      menuInput(category.id!, {
-        ingredients: [{ ingredientId: ingredient.id!, quantity: 1 }],
+      menuInput(mustId(category), {
+        ingredients: [{ ingredientId: mustId(ingredient), quantity: 1 }],
       })
     );
-    const usedInRecipe = useAppStore.getState().deleteIngredient(ingredient.id!);
+    const usedInRecipe = useAppStore.getState().deleteIngredient(mustId(ingredient));
     expect(usedInRecipe.ok).toBe(false);
 
     useAppStore.getState().deleteMenuItem(useAppStore.getState().menuItems[0].id);
     useAppStore.getState().setupInventory({
-      ingredientId: ingredient.id!,
+      ingredientId: mustId(ingredient),
       currentStock: 10,
       minimumStock: 2,
       costPerUnit: 5,
     });
-    const usedInStock = useAppStore.getState().deleteIngredient(ingredient.id!);
+    const usedInStock = useAppStore.getState().deleteIngredient(mustId(ingredient));
     expect(usedInStock.ok).toBe(false);
     if (!usedInStock.ok) expect(usedInStock.error).toMatch(/inventory/i);
   });
@@ -377,13 +382,13 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     const active = useAppStore.getState().createIngredient({
       name: "Beef",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
     const inactive = useAppStore.getState().createIngredient({
       name: "Old sauce",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: false,
     });
     const category = useAppStore.getState().createCategory({
@@ -395,30 +400,30 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     });
 
     expect(useAppStore.getState().createMenuItem(menuInput("")).ok).toBe(false);
-    expect(useAppStore.getState().createMenuItem(menuInput(category.id!, { name: "  ", price: 10 })).ok).toBe(false);
-    expect(useAppStore.getState().createMenuItem(menuInput(category.id!, { price: -1 })).ok).toBe(false);
+    expect(useAppStore.getState().createMenuItem(menuInput(mustId(category), { name: "  ", price: 10 })).ok).toBe(false);
+    expect(useAppStore.getState().createMenuItem(menuInput(mustId(category), { price: -1 })).ok).toBe(false);
     expect(
       useAppStore.getState().createMenuItem(
-        menuInput(category.id!, {
+        menuInput(mustId(category), {
           ingredients: [
-            { ingredientId: active.id!, quantity: 1 },
-            { ingredientId: active.id!, quantity: 2 },
+            { ingredientId: mustId(active), quantity: 1 },
+            { ingredientId: mustId(active), quantity: 2 },
           ],
         })
       ).ok
     ).toBe(false);
     expect(
       useAppStore.getState().createMenuItem(
-        menuInput(category.id!, { ingredients: [{ ingredientId: active.id!, quantity: 0 }] })
+        menuInput(mustId(category), { ingredients: [{ ingredientId: mustId(active), quantity: 0 }] })
       ).ok
     ).toBe(false);
 
     const created = useAppStore.getState().createMenuItem(
-      menuInput(category.id!, {
+      menuInput(mustId(category), {
         name: "  House Burger  ",
         ingredients: [
-          { ingredientId: active.id!, quantity: 0.15 },
-          { ingredientId: inactive.id!, quantity: 0.02 },
+          { ingredientId: mustId(active), quantity: 0.15 },
+          { ingredientId: mustId(inactive), quantity: 0.02 },
         ],
       })
     );
@@ -428,19 +433,19 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     expect(useAppStore.getState().menuItems[0].ingredients).toHaveLength(2);
 
     expect(
-      useAppStore.getState().updateMenuItem(created.id!, menuInput(category.id!, { name: "House Burger Deluxe", price: 320 }))
+      useAppStore.getState().updateMenuItem(mustId(created), menuInput(mustId(category), { name: "House Burger Deluxe", price: 320 }))
         .ok
     ).toBe(true);
-    expect(useAppStore.getState().toggleMenuAvailability(created.id!).ok).toBe(true);
+    expect(useAppStore.getState().toggleMenuAvailability(mustId(created)).ok).toBe(true);
     expect(useAppStore.getState().menuItems[0].isAvailable).toBe(false);
-    expect(useAppStore.getState().deleteMenuItem(created.id!).ok).toBe(true);
+    expect(useAppStore.getState().deleteMenuItem(mustId(created)).ok).toBe(true);
   });
 
   it("blocks menu item deletion while it is on an open order", () => {
     const zone = useAppStore.getState().createZone({ name: "Floor", description: "", isActive: true });
     const table = useAppStore.getState().createTable({
       name: "T1",
-      zoneId: zone.id!,
+      zoneId: mustId(zone),
       capacity: 2,
       isActive: true,
     });
@@ -451,24 +456,24 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
       displayOrder: 1,
       isActive: true,
     });
-    const item = useAppStore.getState().createMenuItem(menuInput(category.id!, { name: "Pasta" }));
+    const item = useAppStore.getState().createMenuItem(menuInput(mustId(category), { name: "Pasta" }));
     useAppStore.getState().createOrder({
-      tableId: table.id!,
+      tableId: mustId(table),
       status: "preparing",
       notes: "",
       customerName: "",
       customerPhone: "",
       items: [
         {
-          menuItemId: item.id!,
-          categoryId: category.id!,
+          menuItemId: mustId(item),
+          categoryId: mustId(category),
           name: "Pasta",
           quantity: 1,
           unitPrice: 250,
         },
       ],
     });
-    const removed = useAppStore.getState().deleteMenuItem(item.id!);
+    const removed = useAppStore.getState().deleteMenuItem(mustId(item));
     expect(removed.ok).toBe(false);
     if (!removed.ok) expect(removed.error).toMatch(/open or preparing/i);
   });
@@ -478,7 +483,7 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     const ingredient = useAppStore.getState().createIngredient({
       name: "Milk",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
 
@@ -492,7 +497,7 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     ).toBe(false);
     expect(
       useAppStore.getState().setupInventory({
-        ingredientId: ingredient.id!,
+        ingredientId: mustId(ingredient),
         currentStock: -1,
         minimumStock: 1,
         costPerUnit: 1,
@@ -500,14 +505,14 @@ describe("zones, tables, categories, ingredients, menu items, and inventory", ()
     ).toBe(false);
 
     const created = useAppStore.getState().setupInventory({
-      ingredientId: ingredient.id!,
+      ingredientId: mustId(ingredient),
       currentStock: 10,
       minimumStock: 4,
       costPerUnit: 32,
     });
     expect(created.ok).toBe(true);
     const duplicate = useAppStore.getState().setupInventory({
-      ingredientId: ingredient.id!,
+      ingredientId: mustId(ingredient),
       currentStock: 1,
       minimumStock: 1,
       costPerUnit: 1,
@@ -595,8 +600,8 @@ describe("defects against the module rules", () => {
       displayOrder: 1,
       isActive: true,
     });
-    useAppStore.getState().createMenuItem(menuInput(category.id!, { name: "Steak" }));
-    const duplicate = useAppStore.getState().createMenuItem(menuInput(category.id!, { name: " steak " }));
+    useAppStore.getState().createMenuItem(menuInput(mustId(category), { name: "Steak" }));
+    const duplicate = useAppStore.getState().createMenuItem(menuInput(mustId(category), { name: " steak " }));
     expect(duplicate.ok).toBe(false);
   });
 
@@ -629,7 +634,7 @@ describe("defects against the module rules", () => {
     const zone = useAppStore.getState().createZone({ name: "Floor", description: "", isActive: true });
     const table = useAppStore.getState().createTable({
       name: "T1",
-      zoneId: zone.id!,
+      zoneId: mustId(zone),
       capacity: Number.NaN,
       isActive: true,
     });
@@ -642,18 +647,18 @@ describe("defects against the module rules", () => {
       displayOrder: 1,
       isActive: true,
     });
-    expect.soft(useAppStore.getState().createMenuItem(menuInput(category.id!, { price: Number.NaN })).ok).toBe(false);
+    expect.soft(useAppStore.getState().createMenuItem(menuInput(mustId(category), { price: Number.NaN })).ok).toBe(false);
 
     const unit = useAppStore.getState().createUnit({ name: "Gram", abbreviation: "g", isActive: true });
     const ingredient = useAppStore.getState().createIngredient({
       name: "Salt",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
     expect.soft(
       useAppStore.getState().setupInventory({
-        ingredientId: ingredient.id!,
+        ingredientId: mustId(ingredient),
         currentStock: Number.NaN,
         minimumStock: 1,
         costPerUnit: 1,
@@ -687,11 +692,11 @@ describe("defects against the module rules", () => {
     const ingredient = useAppStore.getState().createIngredient({
       name: "Flour",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
     const created = useAppStore.getState().setupInventory({
-      ingredientId: ingredient.id!,
+      ingredientId: mustId(ingredient),
       currentStock: 8,
       minimumStock: 2,
       costPerUnit: 20,
@@ -722,7 +727,7 @@ describe("defects against the module rules", () => {
       lines: [
         {
           description: "Spice bag",
-          ingredientId: ingredient.id!,
+          ingredientId: mustId(ingredient),
           quantity: 4,
           unitCost: 10,
           addToInventory: true,
@@ -730,7 +735,7 @@ describe("defects against the module rules", () => {
       ],
     });
     expect(result.ok).toBe(true);
-    const record = useAppStore.getState().inventory.find((item) => item.ingredientId === ingredient.id);
+    const record = useAppStore.getState().inventory.find((item) => item.ingredientId === mustId(ingredient));
     expect(record?.currentStock).toBe(4);
     const movements = useAppStore
       .getState()
@@ -779,16 +784,16 @@ describe("defects against the module rules", () => {
     const ingredient = useAppStore.getState().createIngredient({
       name: "Napkins",
       description: "",
-      unitId: unit.id!,
+      unitId: mustId(unit),
       isActive: true,
     });
     const record = useAppStore.getState().setupInventory({
-      ingredientId: ingredient.id!,
+      ingredientId: mustId(ingredient),
       currentStock: 5,
       minimumStock: 1,
       costPerUnit: 1,
     });
-    expect(() => useAppStore.getState().addStock(record.id!, 1, "Count", "not-a-date")).not.toThrow();
+    expect(() => useAppStore.getState().addStock(mustId(record), 1, "Count", "not-a-date")).not.toThrow();
   });
 
   it("does not restore deleted holidays or units the next time data is loaded", () => {
