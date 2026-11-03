@@ -610,6 +610,16 @@ test("creates a category from the menu page and from the dish form", async ({ pa
   await expect(dishDialog.getByRole("combobox").first()).toContainText("QA Dish Category");
 });
 
+test("shows a 404 and a maintenance page", async ({ page }) => {
+  await page.goto("/this-page-does-not-exist");
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Go to sign in" })).toBeVisible();
+
+  await page.goto("/maintenance");
+  await expect(page.getByRole("heading", { name: "Under maintenance" })).toBeVisible();
+  await expect(page.getByText("The office is briefly closed while we update it. Please come back shortly.")).toBeVisible();
+});
+
 test("sends a staff member away from AI Analytics", async ({ page }) => {
   await page.goto("/login");
   await page.locator('input[type="email"]').fill("meera.ramdoyal@b42.mu");

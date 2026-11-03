@@ -30,9 +30,8 @@ function field(page: Page, label: string) {
 test("describes the product on the sign-in page", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByText("The floor, the books and the wage bill in one place.")).toBeVisible();
-  await expect(page.getByText("Zones, tables, orders, recipes and the storeroom.").first()).toBeVisible();
-  await expect(page.getByText("Purchases, expenses, assets, the journal and the cashbook.").first()).toBeVisible();
-  await expect(page.getByText("Staff, leave, attendance and payslips with CSG, NSF, PRGF and PAYE.").first()).toBeVisible();
+  await expect(page.getByText("Zones, tables, orders, recipes and the storeroom.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await expect(page.getByText("admin@restaurant.com")).toBeVisible();
 });
 

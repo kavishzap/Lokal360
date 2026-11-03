@@ -39,7 +39,8 @@ Do not modify production code without my approval.
 Start by analyzing the codebase and creating a testing plan before running tests.
 
 npm install -D @playwright/test
-npx playwright installnpm install -D @playwright/test
+npx playwright install
+npm install -D @playwright/test
 npx playwright install
 
 npx playwright test

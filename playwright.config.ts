@@ -17,6 +17,7 @@ export default defineConfig({
     reuseExistingServer: false,
     env: {
       E2E_DIST: "1",
+      MAINTENANCE_MODE: "0",
       NEXT_PUBLIC_SUPABASE_URL: "",
       NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
     },

@@ -1,16 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Eye,
-  EyeOff,
-  Landmark,
-  LayoutDashboard,
-  Sparkles,
-  Users,
-  UtensilsCrossed,
-  type LucideIcon,
-} from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -31,36 +22,6 @@ const schema = z.object({
 });
 
 type Values = z.infer<typeof schema>;
-
-const CARD_DEPTH = [10, -14, 16, -8, 12];
-
-const CAPABILITIES: { icon: LucideIcon; title: string; detail: string }[] = [
-  {
-    icon: UtensilsCrossed,
-    title: "The floor",
-    detail: "Zones, tables, orders, recipes and the storeroom.",
-  },
-  {
-    icon: Landmark,
-    title: "The books",
-    detail: "Purchases, expenses, assets, the journal and the cashbook.",
-  },
-  {
-    icon: LayoutDashboard,
-    title: "The owner view",
-    detail: "Sales, what is left after costs, and cash and bank.",
-  },
-  {
-    icon: Users,
-    title: "Payroll",
-    detail: "Staff, leave, attendance and payslips with CSG, NSF, PRGF and PAYE.",
-  },
-  {
-    icon: Sparkles,
-    title: "AI Analytics",
-    detail: "A week-ahead call, the dishes to push, and what runs out first.",
-  },
-];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -147,7 +108,7 @@ export default function LoginPage() {
         <div className="login-grid pointer-events-none absolute inset-0" />
         <div className="login-shift pointer-events-none absolute -top-10 -left-16 size-64 rounded-full bg-blue-500/25 blur-3xl" style={{ "--d": 34 } as React.CSSProperties} />
         <div className="login-shift pointer-events-none absolute right-[-4rem] bottom-8 size-72 rounded-full bg-indigo-400/20 blur-3xl" style={{ "--d": -26 } as React.CSSProperties} />
-        <div className="relative z-10 flex min-h-full w-full flex-col justify-between gap-8 p-10">
+        <div className="relative z-10 flex min-h-full w-full flex-col justify-between gap-10 p-10 xl:p-16">
           <div className="flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 font-semibold">
               B42
@@ -158,33 +119,19 @@ export default function LoginPage() {
             </div>
             <LanguageSwitch tone="dark" />
           </div>
-          <div className="login-shift max-w-md" style={{ "--d": -12 } as React.CSSProperties}>
-            <p className="text-sm font-medium tracking-[0.2em] text-blue-300 uppercase">
+          <div className="login-shift max-w-xl" style={{ "--d": -12 } as React.CSSProperties}>
+            <p className="flex items-center gap-3 text-[11px] font-semibold tracking-[0.32em] text-blue-200 uppercase">
+              <span className="h-px w-8 bg-blue-400" />
               {t("Restaurant back office")}
             </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight">
+            <h1 className="mt-5 max-w-[12em] text-[2.65rem] font-semibold leading-[1.08] tracking-[-0.03em] text-balance text-white xl:text-5xl xl:leading-[1.05]">
               {t("The floor, the books and the wage bill in one place.")}
             </h1>
-            <p className="mt-4 text-slate-300">
+            <p className="mt-6 max-w-sm text-[15px] leading-7 text-pretty text-slate-300">
               {t(
                 "Built for a Mauritian restaurant: tickets in rupees, Workers' Rights Act leave, and the figures an owner checks before service."
               )}
             </p>
-            <div className="mt-6 grid gap-2 sm:grid-cols-2">
-              {CAPABILITIES.map((item, index) => (
-                <div
-                  key={item.title}
-                  className="login-shift flex gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5"
-                  style={{ "--d": CARD_DEPTH[index] } as React.CSSProperties}
-                >
-                  <item.icon className="mt-0.5 size-4 shrink-0 text-blue-300" />
-                  <div>
-                    <p className="text-sm font-medium text-white">{t(item.title)}</p>
-                    <p className="text-sm text-slate-300">{t(item.detail)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
           <p className="text-xs text-slate-500">
             {isSupabaseConfigured()
@@ -196,28 +143,11 @@ export default function LoginPage() {
 
       <div className="flex items-center justify-center bg-slate-50 px-6 py-12">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 font-semibold text-white">
-              B42
-            </div>
-            <div>
-              <p className="font-semibold">{APP_NAME}</p>
-              <p className="text-sm text-slate-500">{t("Back office")}</p>
-            </div>
-          </div>
-          <div className="mb-6 flex size-11 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-            <UtensilsCrossed className="size-5" />
-          </div>
-          <div className="mb-6 space-y-2 lg:hidden">
-            <p className="text-sm font-medium text-slate-800">{t("What you can run from here")}</p>
-            <ul className="space-y-1.5 text-sm text-slate-600">
-              {CAPABILITIES.map((item) => (
-                <li key={item.title}>
-                  <span className="font-medium text-slate-800">{t(item.title)}.</span> {t(item.detail)}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <img
+            src="/Lokal360%20POS%20Terminal%20Logo.png"
+            alt="Lokal360"
+            className="mb-6 h-20 w-auto max-w-full"
+          />
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-2xl font-semibold tracking-tight">{t("Sign in")}</h2>
             <LanguageSwitch />

@@ -69,6 +69,22 @@ const fr: Record<string, string> = {
   Login: "Connexion",
   "Signing in…": "Connexion en cours…",
   "Opening the books…": "Ouverture des comptes…",
+  "Page not found": "Page introuvable",
+  "That address is not part of this office.": "Cette adresse ne fait pas partie de ce bureau.",
+  "Back to the office": "Retour au bureau",
+  "Go to sign in": "Aller à la connexion",
+  "Something went wrong": "Un problème est survenu",
+  "This page could not be opened. Your books are unchanged.":
+    "Cette page n'a pas pu s'ouvrir. Vos comptes n'ont pas changé.",
+  "Try again": "Réessayer",
+  "Under maintenance": "En maintenance",
+  "The machines are being built.": "Les machines sont en cours de montage.",
+  "This page doesn't exist.": "Cette page n'existe pas.",
+  "One restaurant. The floor, the books and the wage bill.":
+    "Un restaurant. La salle, les comptes et la masse salariale.",
+  "The office is briefly closed while we update it. Please come back shortly.":
+    "Le bureau est fermé un moment pour une mise à jour. Revenez bientôt.",
+  "This page could not be loaded.": "Cette page n'a pas pu être chargée.",
   "Demo credentials": "Identifiants de démo",
   "Use the demo administrator account to explore the prototype.":
     "Utilisez le compte administrateur de démo pour explorer le prototype.",
@@ -565,6 +581,22 @@ const mfe: Record<string, string> = {
   Login: "Konekte",
   "Signing in…": "Pe konekte…",
   "Opening the books…": "Pe ouver bann kont…",
+  "Page not found": "Paz pa trouv",
+  "That address is not part of this office.": "Sa ladres la pa fer parti sa biwo la.",
+  "Back to the office": "Retourn dan biwo",
+  "Go to sign in": "Al konekte",
+  "Something went wrong": "Ena enn problem",
+  "This page could not be opened. Your books are unchanged.":
+    "Sa paz la pa'nn kapav ouver. Bann kont pa'nn sanz.",
+  "Try again": "Esey ankor",
+  "Under maintenance": "An travay",
+  "The machines are being built.": "Bann masinn pe monte.",
+  "This page doesn't exist.": "Sa paz la pa existe.",
+  "One restaurant. The floor, the books and the wage bill.":
+    "Enn restoran. Lasal, bann kont ek lapey.",
+  "The office is briefly closed while we update it. Please come back shortly.":
+    "Biwo la ferm enn moman pou enn mizazour. Retourn taler.",
+  "This page could not be loaded.": "Sa paz la pa'nn kapav sarye.",
   "Demo credentials": "Koneksyon demo",
   "Use the demo administrator account to explore the prototype.":
     "Servi kont administrater demo pou get prototip la.",
