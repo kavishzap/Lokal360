@@ -87,26 +87,25 @@ export function NotFoundStage() {
   const { t } = useTranslate();
   return (
     <DarkStage>
-      <p className="flex items-center gap-3 text-[11px] font-semibold tracking-[0.32em] text-blue-200 uppercase">
-        <span className="h-px w-8 bg-blue-400" />
-        404
-      </p>
-      <h1 className="mt-5 max-w-[12em] text-[2.65rem] font-semibold leading-[1.08] tracking-[-0.03em] text-balance text-white xl:text-5xl xl:leading-[1.05]">
-        {t("Page not found")}
-      </h1>
-      <p className="mt-6 max-w-sm text-[15px] leading-7 text-pretty text-slate-300">
-        {t("That address is not part of this office.")}
-      </p>
-      <div className="mt-8">
-        <MissingRobot onDark />
-      </div>
-      <div className="mt-8 flex flex-wrap gap-2">
-        <Button nativeButton={false} render={<Link href="/dashboard" />}>
-          {t("Back to the office")}
-        </Button>
-        <Button nativeButton={false} variant="outline" render={<Link href="/login" />}>
-          {t("Go to sign in")}
-        </Button>
+      <div className="flex flex-col items-center text-center">
+        <p className="flex items-center gap-3 text-[11px] font-semibold tracking-[0.32em] text-blue-200 uppercase">
+          <span className="h-px w-8 bg-blue-400" />
+          404
+        </p>
+        <h1 className="mt-5 text-[2.65rem] font-semibold leading-[1.08] tracking-[-0.03em] text-white xl:text-5xl xl:leading-[1.05]">
+          {t("Page not found")}
+        </h1>
+        <p className="mt-6 max-w-sm text-[15px] leading-7 text-pretty text-slate-300">
+          {t("That address is not part of this office.")}
+        </p>
+        <div className="mt-8">
+          <MissingRobot onDark />
+        </div>
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
+          <Button nativeButton={false} render={<Link href="/dashboard" />}>
+            {t("Back to the office")}
+          </Button>
+        </div>
       </div>
     </DarkStage>
   );

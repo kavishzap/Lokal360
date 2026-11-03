@@ -613,7 +613,8 @@ test("creates a category from the menu page and from the dish form", async ({ pa
 test("shows a 404 and a maintenance page", async ({ page }) => {
   await page.goto("/this-page-does-not-exist");
   await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Go to sign in" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back to the office" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Go to sign in" })).toHaveCount(0);
 
   await page.goto("/maintenance");
   await expect(page.getByRole("heading", { name: "Under maintenance" })).toBeVisible();
