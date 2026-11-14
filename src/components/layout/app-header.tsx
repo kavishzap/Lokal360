@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogOut, Menu, Settings, User } from "lucide-react";
+import { LogOut, Settings, User } from "lucide-react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,37 +24,47 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useTranslate } from "@/i18n/use-translate";
+import { companyInitials } from "@/lib/company";
+import { APP_NAME } from "@/lib/constants";
 import { pageMeta } from "@/lib/nav";
+import { useAppStore } from "@/store/app-store";
 import { useAuthStore } from "@/store/auth-store";
-import { useUiStore } from "@/store/ui-store";
+
+export const officeBarClass =
+  "sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 shadow-[0_8px_24px_rgba(15,23,42,0.06)] backdrop-blur-md";
 
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
-  const setMobileNavOpen = useUiStore((state) => state.setMobileNavOpen);
+  const company = useAppStore((state) => state.company);
   const { t } = useTranslate();
   const meta = pageMeta(pathname);
+  const brand = company?.name?.trim() || APP_NAME;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="flex items-center justify-between gap-4 px-4 py-3 lg:px-6">
-        <div className="flex min-w-0 items-center gap-3">
-          {session?.role === "Staff" ? null : (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setMobileNavOpen(true)}
-            >
-              <Menu />
-            </Button>
+    <header className={officeBarClass}>
+      <div className="flex h-14 items-center justify-between gap-4 px-4 lg:px-6">
+        <div className="flex min-w-0 items-center gap-4">
+          {session?.role === "Staff" ? (
+            <span className="truncate text-sm font-semibold text-slate-900">{t(meta.title)}</span>
+          ) : (
+            <Link href="/dashboard" className="flex shrink-0 items-center gap-2.5">
+              <span className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-blue-600 text-[11px] font-semibold text-white">
+                {company?.logo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={company.logo} alt="" className="size-full object-cover" />
+                ) : (
+                  companyInitials(brand)
+                )}
+              </span>
+              <span className="hidden text-sm font-semibold text-slate-900 sm:block">{brand}</span>
+            </Link>
           )}
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold text-slate-900">{t(meta.title)}</h1>
-            <Breadcrumb className="hidden sm:block">
-              <BreadcrumbList>
+          {meta.crumbs.length > 1 ? (
+            <Breadcrumb className="hidden min-w-0 md:block">
+              <BreadcrumbList className="flex-nowrap text-xs">
                 {meta.crumbs.map((crumb, index) => (
                   <span key={`${crumb.label}-${index}`} className="contents">
                     <BreadcrumbItem>
@@ -63,7 +73,9 @@ export function AppHeader() {
                           {t(crumb.label)}
                         </BreadcrumbLink>
                       ) : (
-                        <BreadcrumbPage>{t(crumb.label)}</BreadcrumbPage>
+                        <BreadcrumbPage className="truncate font-medium text-slate-700">
+                          {t(crumb.label)}
+                        </BreadcrumbPage>
                       )}
                     </BreadcrumbItem>
                     {index < meta.crumbs.length - 1 ? <BreadcrumbSeparator /> : null}
@@ -71,7 +83,7 @@ export function AppHeader() {
                 ))}
               </BreadcrumbList>
             </Breadcrumb>
-          </div>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2">
@@ -81,7 +93,7 @@ export function AppHeader() {
               render={
                 <Button variant="ghost" className="h-9 gap-2 px-2">
                   <Avatar size="sm">
-                    <AvatarFallback>
+                    <AvatarFallback className="bg-blue-600 text-white">
                       {session?.name
                         .split(" ")
                         .map((part) => part[0])

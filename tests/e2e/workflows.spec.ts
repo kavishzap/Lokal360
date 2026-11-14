@@ -11,11 +11,8 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
-async function openSection(page: Page, name: string) {
-  const section = page.getByRole("button", { name, exact: true });
-  if ((await section.getAttribute("aria-expanded")) !== "true") {
-    await section.click();
-  }
+async function openSection(page: Page, _name: string) {
+  if (!page.url().endsWith("/dashboard")) await page.goto("/dashboard");
 }
 
 function field(page: Page, label: string) {
@@ -223,6 +220,7 @@ test("opens the cash account in the ledger and the cashbook", async ({ page }) =
   await expect(page.getByRole("combobox")).toContainText("1000 Cash on hand");
   await expect(page.getByText("Debits")).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Cashbook", exact: true }).click();
   await expect(page.getByRole("combobox")).toContainText("Cash on hand");
   await expect(page.getByText("Receipts", { exact: true })).toBeVisible();
@@ -240,11 +238,13 @@ test("shows this year's sales, expenses and profit", async ({ page }) => {
   await page.getByRole("button", { name: "Generate PDF" }).click();
   await expect(page.getByText("PDF export is not connected yet.")).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Expense report", exact: true }).click();
   await expect(page.getByText("Total spend")).toBeVisible();
   await expect(page.getByText("Operating expenses").first()).toBeVisible();
   await expect(page.getByText("Rs 4,200.00").first()).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "P&L", exact: true }).click();
   await expect(page.getByText("Gross profit").first()).toBeVisible();
   await expect(page.getByText("What is left").first()).toBeVisible();
@@ -379,15 +379,13 @@ test("keeps staff off the books and the administrator off the staff page", async
 test("switches the books into Mauritian Kreol", async ({ page }) => {
   await login(page);
   await page.getByRole("button", { name: "KR", exact: true }).click();
-  await expect(page.getByText("Konman to'nn fer")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operasyon" })).toBeVisible();
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByText("How much you took")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
 });
 
-test("opens a section from the collapsed sidebar", async ({ page }) => {
+test("opens a module from the home cards", async ({ page }) => {
   await login(page);
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
-  await page.getByRole("button", { name: "Restaurant Management", exact: true }).click();
   await page.getByRole("link", { name: "Zones", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/zones$/);
   await expect(page.getByRole("heading", { name: "Zones" }).first()).toBeVisible();
@@ -411,11 +409,10 @@ test("finds a tracked ingredient in inventory", async ({ page }) => {
   await expect(page.getByText("Ingredients tracked")).toBeVisible();
 });
 
-test("shows rupee figures on the owner dashboard", async ({ page }) => {
+test("shows the module cards on the owner dashboard", async ({ page }) => {
   await login(page);
   await expect(page.getByRole("heading", { name: "Hello, Alex" })).toBeVisible();
-  await expect(page.getByText("How much you took")).toBeVisible();
-  await expect(page.getByText(/Rs/).first()).toBeVisible();
-  await expect(page.getByText("Cash and bank")).toBeVisible();
-  await expect(page.getByText("In the bank")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounting" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Payroll" })).toBeVisible();
 });

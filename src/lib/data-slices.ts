@@ -89,7 +89,7 @@ function routeSlices(pathname: string): DataSlice[] {
   if (under(pathname, "/dashboard/me")) {
     return ["company", "policy", "holidays", "employees", "leave", "attendance", "payslips"];
   }
-  if (pathname === "/dashboard") return ["company", "orders", "invoices", "purchases", "expenses", "journals", "accounts"];
+  if (pathname === "/dashboard") return ["company"];
   return ["company"];
 }
 

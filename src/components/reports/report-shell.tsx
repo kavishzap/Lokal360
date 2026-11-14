@@ -115,13 +115,13 @@ export function ReportShell({
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 bg-slate-50 px-6 py-4">
-          <p className="text-xs font-medium tracking-[0.16em] text-slate-400 uppercase">
+        <div className="border-b border-sky-800 bg-sky-700 px-6 py-4 text-white">
+          <p className="text-xs font-medium tracking-[0.16em] text-sky-100 uppercase">
             {company?.name?.trim() || APP_NAME}
           </p>
-          {registration ? <p className="text-xs text-slate-400">{registration}</p> : null}
-          <p className="mt-1 text-lg font-semibold text-slate-900">{title}</p>
-          <p className="text-sm text-slate-500">
+          {registration ? <p className="text-xs text-sky-100">{registration}</p> : null}
+          <p className="mt-1 text-lg font-semibold">{title}</p>
+          <p className="text-sm text-sky-100">
             {audienceMeta ? t(audienceMeta.label) : ""} · {formatDate(query.from)} – {formatDate(query.to)}
           </p>
         </div>

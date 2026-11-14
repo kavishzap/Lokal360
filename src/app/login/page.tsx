@@ -114,16 +114,12 @@ export default function LoginPage() {
         <div className="login-shift pointer-events-none absolute -top-10 -left-16 size-64 rounded-full bg-blue-500/25 blur-3xl" style={{ "--d": 34 } as React.CSSProperties} />
         <div className="login-shift pointer-events-none absolute right-[-4rem] bottom-8 size-72 rounded-full bg-indigo-400/20 blur-3xl" style={{ "--d": -26 } as React.CSSProperties} />
         <div className="relative z-10 flex min-h-full w-full flex-col justify-between gap-10 p-10 xl:p-16">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3">
             <img
               src="/Lokal360%20POS%20Terminal%20Logo.png"
               alt="Lokal 360"
               className="h-9 w-auto brightness-0 invert"
             />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">Lokal 360</p>
-              <p className="text-sm text-slate-400">{t("Management")}</p>
-            </div>
             <LanguageSwitch tone="dark" />
           </div>
           <div className="login-shift max-w-xl" style={{ "--d": -12 } as React.CSSProperties}>

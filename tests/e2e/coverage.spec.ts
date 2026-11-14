@@ -48,11 +48,8 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
-async function openSection(page: Page, name: string) {
-  const section = page.getByRole("button", { name, exact: true });
-  if ((await section.getAttribute("aria-expanded")) !== "true") {
-    await section.click();
-  }
+async function openSection(page: Page, _name: string) {
+  if (!page.url().endsWith("/dashboard")) await page.goto("/dashboard");
 }
 
 function field(page: Page, label: string) {
@@ -104,17 +101,18 @@ test("shows the demo password on the sign-in page", async ({ page }) => {
 test("remembers the language after a reload", async ({ page }) => {
   await login(page);
   await page.getByRole("button", { name: "KR", exact: true }).click();
-  await expect(page.getByText("Konman to'nn fer")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operasyon" })).toBeVisible();
   await page.reload();
-  await expect(page.getByText("Konman to'nn fer")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operasyon" })).toBeVisible();
 });
 
-test("remembers a collapsed sidebar after a reload", async ({ page }) => {
+test("keeps the module cards after a reload", async ({ page }) => {
   await login(page);
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
-  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounting" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Payroll" })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Zones", exact: true })).toBeVisible();
 });
 
 test("opens settings and signs out from the header account menu", async ({ page }) => {
@@ -143,15 +141,18 @@ test("searches zones, tables, categories and ingredients", async ({ page }) => {
   await expect(page.getByRole("row", { name: /Indoor Dining/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /Outdoor Terrace/ })).toHaveCount(0);
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Tables", exact: true }).click();
   await page.getByPlaceholder("Search tables...").fill("Table 01");
   await expect(page.getByRole("row", { name: /Table 01/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /Table 02/ })).toHaveCount(0);
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Categories", exact: true }).click();
   await page.getByPlaceholder("Search categories...").fill("Burgers");
   await expect(page.getByRole("row", { name: /Burgers/ })).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Ingredients", exact: true }).click();
   await page.getByPlaceholder("Search ingredients...").fill("Beef Patty");
   await expect(page.getByRole("row", { name: /Beef Patty/ })).toBeVisible();
@@ -259,11 +260,13 @@ test("creates one customer from an order phone number", async ({ page }) => {
   await dialog.getByRole("button", { name: "Create order" }).click();
   await expect(page.getByRole("row", { name: /QA Guest/ })).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Customers", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Customers" }).first()).toBeVisible();
   await expect(page.getByRole("row", { name: /QA Guest/ })).toBeVisible();
   await expect(page.getByRole("row", { name: /57119901/ })).toHaveCount(1);
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Orders", exact: true }).click();
   await page.getByRole("button", { name: "Add order" }).click();
   await dialog.getByText("Select zone").click();
@@ -277,6 +280,7 @@ test("creates one customer from an order phone number", async ({ page }) => {
   await dialog.getByRole("button", { name: "Add", exact: true }).click();
   await dialog.getByRole("button", { name: "Create order" }).click();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Customers", exact: true }).click();
   await expect(page.getByRole("row", { name: /57119901/ })).toHaveCount(1);
   await expect(page.getByRole("row", { name: /QA Guest Again/ })).toBeVisible();
@@ -339,6 +343,7 @@ test("rejects an expense with no payee and an asset with no cost", async ({ page
   await expect(dialog.getByText("Payee is required")).toBeVisible();
   await page.keyboard.press("Escape");
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Assets", exact: true }).click();
   await page.getByRole("button", { name: "Register asset" }).click();
   dialog = page.getByRole("dialog");
@@ -355,14 +360,17 @@ test("searches purchases, expenses, assets and the journal", async ({ page }) =>
   await page.getByPlaceholder("Search purchases...").fill("Island Foods");
   await expect(page.getByText("Island Foods").first()).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Expenses", exact: true }).click();
   await page.getByPlaceholder("Search expenses...").fill("CEB");
   await expect(page.getByText("CEB").first()).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Assets", exact: true }).click();
   await page.getByPlaceholder("Search assets...").fill("Hiace");
   await expect(page.getByText("Toyota Hiace").first()).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Journal Book", exact: true }).click();
   await page.getByPlaceholder("Search journal...").fill("Opening balances");
   await expect(page.getByText("Opening balances")).toBeVisible();
@@ -443,6 +451,7 @@ test("switches the ledger and the cashbook to the bank", async ({ page }) => {
   await expect(page.getByRole("combobox")).toContainText("1010 Bank");
   await expect(page.getByText("Credits")).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Cashbook", exact: true }).click();
   await expect(page.getByRole("heading", { name: "1000 Cash on hand" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "1010 Bank" })).toBeVisible();
@@ -477,11 +486,11 @@ test("puts the company BRN on the sales report", async ({ page }) => {
   await expect(page.getByText("BRN C99999999")).toBeVisible();
 });
 
-test("shows the month breakdown on the dashboard", async ({ page }) => {
+test("shows the module cards on the dashboard", async ({ page }) => {
   await login(page);
-  await expect(page.getByText("This month")).toBeVisible();
-  await expect(page.getByText("Month by month")).toBeVisible();
-  await expect(page.getByText("Where the money went")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounting" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Payroll" })).toBeVisible();
 });
 
 test("searches the payroll list for one person", async ({ page }) => {

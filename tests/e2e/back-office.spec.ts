@@ -12,10 +12,7 @@ async function login(page: Page) {
 }
 
 async function openRestaurant(page: Page) {
-  const section = page.getByRole("button", { name: "Restaurant Management" });
-  if ((await section.getAttribute("aria-expanded")) !== "true") {
-    await section.click();
-  }
+  if (!page.url().endsWith("/dashboard")) await page.goto("/dashboard");
 }
 
 test("sends an anonymous visitor to the login page and blocks the dashboard", async ({ page }) => {
@@ -41,15 +38,12 @@ test("rejects an empty password and a wrong password, then signs in", async ({ p
   await page.getByRole("button", { name: "Login" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByText("Alex Martin").first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Restaurant Management" })).toHaveAttribute(
-    "aria-expanded",
-    "false"
-  );
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Zones", exact: true })).toBeVisible();
 });
 
-test("navigates the restaurant modules from the sidebar", async ({ page }) => {
+test("navigates the operations modules from the home cards", async ({ page }) => {
   await login(page);
-  await openRestaurant(page);
   const links: Array<[string, string]> = [
     ["Zones", "/dashboard/zones"],
     ["Tables", "/dashboard/tables"],
@@ -60,6 +54,7 @@ test("navigates the restaurant modules from the sidebar", async ({ page }) => {
   ];
 
   for (const [label, href] of links) {
+    await page.goto("/dashboard");
     await page.getByRole("link", { name: label, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`${href}$`));
     await expect(page.getByRole("heading", { name: label }).first()).toBeVisible();
@@ -109,6 +104,7 @@ test("assigns a table to a zone and blocks a duplicate name in that zone", async
   await page.getByRole("button", { name: "Create zone" }).click();
   await expect(page.getByRole("row", { name: /QA Floor/ })).toBeVisible();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Tables", exact: true }).click();
   await page.getByRole("button", { name: "Add table" }).click();
   const dialog = page.getByRole("dialog");
@@ -126,6 +122,7 @@ test("assigns a table to a zone and blocks a duplicate name in that zone", async
   await expect(page.getByText("A table with this name already exists in the selected zone.")).toBeVisible();
   await page.keyboard.press("Escape");
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Zones", exact: true }).click();
   await page.getByRole("row", { name: /QA Floor/ }).getByRole("button").nth(2).click();
   await page.getByRole("button", { name: "Delete" }).click();
@@ -206,6 +203,7 @@ test("tracks an ingredient and refuses to remove more stock than is on hand", as
   await page.getByRole("option", { name: "Kilogram (kg)" }).click();
   await ingredientDialog.getByRole("button", { name: "Create ingredient" }).click();
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Inventory", exact: true }).click();
   await page.getByRole("button", { name: "Track ingredient" }).click();
   const dialog = page.getByRole("dialog");

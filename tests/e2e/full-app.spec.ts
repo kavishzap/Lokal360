@@ -11,28 +11,26 @@ async function login(page: Page) {
   await expect(page).toHaveURL(/\/dashboard$/);
 }
 
-async function openSection(page: Page, name: string) {
-  const section = page.getByRole("button", { name, exact: true });
-  if ((await section.getAttribute("aria-expanded")) !== "true") {
-    await section.click();
-  }
+async function openSection(page: Page, _name: string) {
+  if (!page.url().endsWith("/dashboard")) await page.goto("/dashboard");
 }
 
 async function expectPage(page: Page, link: string, href: string, heading: string) {
+  if (!page.url().endsWith("/dashboard")) await page.goto("/dashboard");
   await page.getByRole("link", { name: link, exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`${href}$`));
   await expect(page.getByRole("heading", { name: heading, exact: true }).first()).toBeVisible();
 }
 
-test("shows the owner's money on the dashboard", async ({ page }) => {
+test("shows the module cards on the dashboard", async ({ page }) => {
   await login(page);
   await expect(page.getByRole("heading", { name: "Hello, Alex" })).toBeVisible();
-  await expect(page.getByText("How much you took")).toBeVisible();
-  await expect(page.getByText("Where the money went")).toBeVisible();
-  await expect(page.getByText("Cash and bank")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Accounting" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Payroll" })).toBeVisible();
 });
 
-test("opens every back-office page from the sidebar", async ({ page }) => {
+test("opens every back-office page from the home cards", async ({ page }) => {
   await login(page);
 
   await openSection(page, "Restaurant Management");
@@ -64,6 +62,7 @@ test("opens every back-office page from the sidebar", async ({ page }) => {
   await expectPage(page, "Pay and file", "/dashboard/payroll/run", "Pay and file");
   await expectPage(page, "Policies", "/dashboard/payroll/policies", "Payroll policies");
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard\/settings$/);
   await expect(page.getByRole("heading", { name: "Settings" }).first()).toBeVisible();
@@ -95,6 +94,7 @@ test("shows names, not ids, in edit dropdowns", async ({ page }) => {
   await expect(tableDialog.getByRole("combobox")).not.toContainText(/[0-9a-f]{8}-/);
   await page.keyboard.press("Escape");
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Ingredients", exact: true }).click();
   await page.getByRole("row", { name: /Chicken Breast/ }).getByRole("button").first().click();
   const ingredientDialog = page.getByRole("dialog");
@@ -102,6 +102,7 @@ test("shows names, not ids, in edit dropdowns", async ({ page }) => {
   await expect(ingredientDialog.getByRole("combobox")).not.toContainText(/[0-9a-f]{8}-/);
   await page.keyboard.press("Escape");
 
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Menu Items", exact: true }).click();
   await page.getByPlaceholder("Search menu items...").fill("Chicken Burger");
   const card = page
@@ -125,8 +126,9 @@ test("signs staff in to their own page and keeps them there", async ({ page }) =
   await expect(page).toHaveURL(/\/dashboard\/me$/);
 });
 
-test("saves the company name onto the sidebar", async ({ page }) => {
+test("saves the company name into the header", async ({ page }) => {
   await login(page);
+  await page.goto("/dashboard");
   await page.getByRole("link", { name: "Settings", exact: true }).click();
   await page.getByPlaceholder("B42 Bistro", { exact: true }).fill("QA Bistro");
   await page.getByRole("button", { name: "Save company" }).click();
@@ -137,11 +139,12 @@ test("saves the company name onto the sidebar", async ({ page }) => {
 test("switches the language and signs out", async ({ page }) => {
   await login(page);
   await page.getByRole("button", { name: "FR", exact: true }).click();
-  await expect(page.getByText("Combien vous avez fait")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Opérations" })).toBeVisible();
   await page.getByRole("button", { name: "EN", exact: true }).click();
-  await expect(page.getByText("How much you took")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Logout", exact: true }).click();
+  await page.getByRole("button", { name: /Alex Martin/ }).click();
+  await page.getByRole("menuitem", { name: "Logout" }).click();
   await expect(page).toHaveURL(/\/login/);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 });

@@ -60,7 +60,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
   {
     id: "restaurant",
-    label: "Restaurant Management",
+    label: "Operations",
     icon: UtensilsCrossed,
     children: [
       { href: "/dashboard/zones", label: "Zones", icon: MapPinned },
@@ -126,7 +126,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Zones",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Zones" },
       ],
     },
@@ -134,7 +134,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Tables",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Tables" },
       ],
     },
@@ -142,7 +142,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Categories",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Categories" },
       ],
     },
@@ -150,7 +150,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Units of measurement",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Units" },
       ],
     },
@@ -158,7 +158,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Ingredients",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Ingredients" },
       ],
     },
@@ -166,7 +166,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Menu Items",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Menu Items" },
       ],
     },
@@ -174,7 +174,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Customers",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Customers" },
       ],
     },
@@ -182,7 +182,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Orders",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Orders" },
       ],
     },
@@ -190,7 +190,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Inventory",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Inventory" },
       ],
     },
@@ -198,7 +198,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Balance inventory",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Restaurant" },
+        { label: "Operations" },
         { label: "Balance inventory" },
       ],
     },

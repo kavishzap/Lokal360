@@ -46,11 +46,11 @@ export function DataTable<T>({
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
       <Table>
         <TableHeader>
-          <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+          <TableRow className="border-0 bg-sky-700 hover:bg-sky-700">
             {columns.map((column) => (
               <TableHead
                 key={column.header}
-                className={`h-11 px-4 text-xs tracking-wide text-slate-500 uppercase ${column.className ?? ""}`}
+                className={`h-11 px-4 text-xs tracking-wide text-white uppercase ${column.className ?? ""}`}
               >
                 {column.header}
               </TableHead>
