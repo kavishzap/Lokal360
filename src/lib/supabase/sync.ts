@@ -1,5 +1,5 @@
 import { toast } from "sonner";
-import { ensureSystemAccounts } from "@/data/seed";
+import { ensureSystemAccounts, IDS } from "@/data/seed";
 import { defaultCompany } from "@/lib/company";
 import { type DataSlice } from "@/lib/data-slices";
 import { defaultPayrollPolicy } from "@/lib/payroll";
@@ -13,6 +13,7 @@ import type {
   Employee,
   Expense,
   FixedAsset,
+  Invoice,
   InventoryItem,
   InventoryTransaction,
   JournalEntry,
@@ -110,6 +111,7 @@ function sliceForTable(table: string): DataSlice | null {
     inventory_items: "inventory",
     inventory_transactions: "movements",
     customers: "customers",
+    suppliers: "suppliers",
     orders: "orders",
     order_items: "orders",
     accounts: "accounts",
@@ -119,6 +121,9 @@ function sliceForTable(table: string): DataSlice | null {
     purchase_lines: "purchases",
     expenses: "expenses",
     expense_lines: "expenses",
+    invoices: "invoices",
+    invoice_lines: "invoices",
+    invoice_payments: "invoices",
     fixed_assets: "assets",
     employees: "employees",
     leave_requests: "leave",
@@ -155,6 +160,8 @@ function sliceValue(slice: DataSlice, data: Partial<AppData>) {
       return data.transactions ?? [];
     case "customers":
       return data.customers ?? [];
+    case "suppliers":
+      return data.suppliers ?? [];
     case "orders":
       return data.orders ?? [];
     case "accounts":
@@ -165,6 +172,8 @@ function sliceValue(slice: DataSlice, data: Partial<AppData>) {
       return data.purchases ?? [];
     case "expenses":
       return data.expenses ?? [];
+    case "invoices":
+      return data.invoices ?? [];
     case "assets":
       return data.assets ?? [];
     case "employees":
@@ -267,7 +276,18 @@ export async function loadSlices(names: DataSlice[]): Promise<Partial<AppData>> 
       const job = fetchSlice(name)
         .then((part) => {
           loaded.add(name);
-          baseline.set(name, fingerprint(name, part));
+          if (name === "accounts" && part.accounts) {
+            const seeded = new Set<string>([IDS.accounts.receivable, IDS.accounts.vatPayable]);
+            const persisted = part.accounts.filter((account) => !seeded.has(account.id));
+            baseline.set(
+              name,
+              fingerprint(name, {
+                accounts: persisted.length === part.accounts.length ? part.accounts : persisted,
+              })
+            );
+          } else {
+            baseline.set(name, fingerprint(name, part));
+          }
           return part;
         })
         .finally(() => {
@@ -419,6 +439,23 @@ async function fetchSlice(slice: DataSlice): Promise<Partial<AppData>> {
           updatedAt: text(row.updated_at),
         })),
       };
+    case "suppliers":
+      try {
+        return {
+          suppliers: (await rows("suppliers")).map((row) => ({
+            id: text(row.id),
+            name: text(row.name),
+            phone: text(row.phone),
+            email: text(row.email),
+            createdAt: text(row.created_at),
+            updatedAt: text(row.updated_at),
+          })),
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("does not exist") || message.includes("schema cache")) return { suppliers: [] };
+        throw error;
+      }
     case "orders": {
       const [orderRows, orderItemRows] = await Promise.all([rows("orders"), rows("order_items")]);
       const orderItems = new Map<string, Order["items"]>();
@@ -518,6 +555,7 @@ async function fetchSlice(slice: DataSlice): Promise<Partial<AppData>> {
         purchases: purchaseRows.map((row) => ({
           id: text(row.id),
           number: text(row.number),
+          supplierId: text(row.supplier_id) || null,
           supplier: text(row.supplier),
           invoiceNumber: text(row.invoice_number),
           date: text(row.purchase_date),
@@ -554,6 +592,70 @@ async function fetchSlice(slice: DataSlice): Promise<Partial<AppData>> {
           payment: text(row.payment) as PurchasePayment,
           notes: text(row.notes),
           lines: expenseLines.get(text(row.id)) ?? [],
+          journalEntryId: text(row.journal_entry_id) || null,
+          createdAt: text(row.created_at),
+          updatedAt: text(row.updated_at),
+        })),
+      };
+    }
+    case "invoices": {
+      let invoiceRows: Row[];
+      let invoiceLineRows: Row[];
+      let paymentRows: Row[];
+      try {
+        [invoiceRows, invoiceLineRows, paymentRows] = await Promise.all([
+          rows("invoices"),
+          rows("invoice_lines"),
+          rows("invoice_payments"),
+        ]);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("does not exist") || message.includes("schema cache")) return { invoices: [] };
+        throw error;
+      }
+      const invoiceLines = new Map<string, Invoice["lines"]>();
+      for (const row of invoiceLineRows) {
+        const invoiceId = text(row.invoice_id);
+        const list = invoiceLines.get(invoiceId) ?? [];
+        list.push({
+          id: text(row.id),
+          description: text(row.description),
+          menuItemId: text(row.menu_item_id) || null,
+          quantity: num(row.quantity),
+          unitPrice: num(row.unit_price),
+          vatRate: num(row.vat_rate),
+        });
+        invoiceLines.set(invoiceId, list);
+      }
+      const payments = new Map<string, Invoice["payments"]>();
+      for (const row of paymentRows) {
+        const invoiceId = text(row.invoice_id);
+        const list = payments.get(invoiceId) ?? [];
+        const method = text(row.method) === "cash" ? "cash" : "bank";
+        list.push({
+          id: text(row.id),
+          date: text(row.paid_on),
+          amount: num(row.amount),
+          method,
+          reference: text(row.reference),
+          journalEntryId: text(row.journal_entry_id) || null,
+        });
+        payments.set(invoiceId, list);
+      }
+      return {
+        invoices: invoiceRows.map((row) => ({
+          id: text(row.id),
+          number: text(row.number),
+          customerId: text(row.customer_id) || null,
+          customerName: text(row.customer_name),
+          customerPhone: text(row.customer_phone),
+          billTo: text(row.bill_to),
+          date: text(row.invoice_date),
+          dueDate: text(row.due_date),
+          status: text(row.status) as Invoice["status"],
+          notes: text(row.notes),
+          lines: invoiceLines.get(text(row.id)) ?? [],
+          payments: payments.get(text(row.id)) ?? [],
           journalEntryId: text(row.journal_entry_id) || null,
           createdAt: text(row.created_at),
           updatedAt: text(row.updated_at),
@@ -867,6 +969,17 @@ async function saveAll(data: AppData) {
     }))
   );
   await upsert(
+    "suppliers",
+    data.suppliers.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      email: row.email,
+      created_at: row.createdAt,
+      updated_at: row.updatedAt,
+    }))
+  );
+  await upsert(
     "orders",
     data.orders.map((row) => ({
       id: row.id,
@@ -934,6 +1047,7 @@ async function saveAll(data: AppData) {
     data.purchases.map((row) => ({
       id: row.id,
       number: row.number,
+      supplier_id: row.supplierId,
       supplier: row.supplier,
       invoice_number: row.invoiceNumber,
       purchase_date: row.date,
@@ -1054,6 +1168,24 @@ async function saveAll(data: AppData) {
     )
   );
   await upsert(
+    "invoices",
+    data.invoices.map((row) => ({
+      id: row.id,
+      number: row.number,
+      customer_id: row.customerId,
+      customer_name: row.customerName,
+      customer_phone: row.customerPhone,
+      bill_to: row.billTo,
+      invoice_date: row.date,
+      due_date: row.dueDate,
+      status: row.status,
+      notes: row.notes,
+      journal_entry_id: row.journalEntryId,
+      created_at: row.createdAt,
+      updated_at: row.updatedAt,
+    }))
+  );
+  await upsert(
     "expense_lines",
     data.expenses.flatMap((expense) =>
       expense.lines.map((line) => ({
@@ -1062,6 +1194,34 @@ async function saveAll(data: AppData) {
         description: line.description,
         account_id: line.accountId,
         amount: line.amount,
+      }))
+    )
+  );
+  await upsert(
+    "invoice_lines",
+    data.invoices.flatMap((invoice) =>
+      invoice.lines.map((line) => ({
+        id: line.id,
+        invoice_id: invoice.id,
+        description: line.description,
+        menu_item_id: line.menuItemId,
+        quantity: line.quantity,
+        unit_price: line.unitPrice,
+        vat_rate: line.vatRate,
+      }))
+    )
+  );
+  await upsert(
+    "invoice_payments",
+    data.invoices.flatMap((invoice) =>
+      invoice.payments.map((payment) => ({
+        id: payment.id,
+        invoice_id: invoice.id,
+        paid_on: payment.date,
+        amount: payment.amount,
+        method: payment.method,
+        reference: payment.reference,
+        journal_entry_id: payment.journalEntryId,
       }))
     )
   );
@@ -1142,6 +1302,8 @@ async function saveAll(data: AppData) {
   await retain("journal_lines", data.journalEntries.flatMap((entry) => entry.lines.map((line) => line.id)));
   await retain("purchase_lines", data.purchases.flatMap((purchase) => purchase.lines.map((line) => line.id)));
   await retain("expense_lines", data.expenses.flatMap((expense) => expense.lines.map((line) => line.id)));
+  await retain("invoice_lines", data.invoices.flatMap((invoice) => invoice.lines.map((line) => line.id)));
+  await retain("invoice_payments", data.invoices.flatMap((invoice) => invoice.payments.map((payment) => payment.id)));
   await retain("inventory_transactions", data.transactions.map((row) => row.id));
   await retain("leave_requests", data.leaveRequests.map((row) => row.id));
   await retain("attendance_records", data.attendance.map((row) => row.id));
@@ -1150,7 +1312,9 @@ async function saveAll(data: AppData) {
   await retain("customers", data.customers.map((row) => row.id));
   await retain("payroll_runs", data.payrollRuns.map((row) => row.id));
   await retain("purchases", data.purchases.map((row) => row.id));
+  await retain("suppliers", data.suppliers.map((row) => row.id));
   await retain("expenses", data.expenses.map((row) => row.id));
+  await retain("invoices", data.invoices.map((row) => row.id));
   await retain("fixed_assets", data.assets.map((row) => row.id));
   await retain("journal_entries", data.journalEntries.map((row) => row.id));
   await retain("inventory_items", data.inventory.map((row) => row.id));

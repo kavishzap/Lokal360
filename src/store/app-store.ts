@@ -2,7 +2,9 @@ import { create } from "zustand";
 import {
   accountByCode,
   expenseTotal,
+  invoiceTotals,
   lineAmount,
+  money,
   nextDocumentNumber,
   purchaseTotal,
   SYSTEM_ACCOUNT_CODES,
@@ -41,6 +43,9 @@ import type {
   InventoryTransaction,
   InventoryTransactionType,
   Customer,
+  Invoice,
+  InvoiceLine,
+  InvoicePayment,
   JournalEntry,
   JournalLine,
   MenuCategory,
@@ -52,6 +57,7 @@ import type {
   OrderStatus,
   Purchase,
   PurchasePayment,
+  Supplier,
   RestaurantTable,
   Zone,
 } from "@/types";
@@ -93,13 +99,38 @@ type PurchaseLineInput = {
   unitCost: number;
   addToInventory: boolean;
 };
+type SupplierInput = Pick<Supplier, "name" | "phone" | "email">;
 type PurchaseInput = {
-  supplier: string;
+  supplierId: string;
   invoiceNumber: string;
   date: string;
   payment: PurchasePayment;
   notes: string;
   lines: PurchaseLineInput[];
+};
+type InvoiceLineInput = {
+  description: string;
+  menuItemId: string | null;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+};
+type InvoiceInput = {
+  customerId: string | null;
+  customerName: string;
+  customerPhone: string;
+  billTo: string;
+  date: string;
+  dueDate: string;
+  notes: string;
+  lines: InvoiceLineInput[];
+  issue: boolean;
+};
+type InvoicePaymentInput = {
+  date: string;
+  amount: number;
+  method: "cash" | "bank";
+  reference: string;
 };
 type ExpenseInput = {
   payee: string;
@@ -189,6 +220,9 @@ interface AppState extends AppData {
   createCustomer: (input: CustomerInput) => ActionResult;
   updateCustomer: (id: string, input: CustomerInput) => ActionResult;
   deleteCustomer: (id: string) => ActionResult;
+  createSupplier: (input: SupplierInput) => ActionResult;
+  updateSupplier: (id: string, input: SupplierInput) => ActionResult;
+  deleteSupplier: (id: string) => ActionResult;
   createOrder: (input: OrderInput) => ActionResult;
   updateOrder: (id: string, input: OrderInput) => ActionResult;
   deleteOrder: (id: string) => ActionResult;
@@ -201,6 +235,11 @@ interface AppState extends AppData {
   deletePurchase: (id: string) => ActionResult;
   createExpense: (input: ExpenseInput) => ActionResult;
   deleteExpense: (id: string) => ActionResult;
+  saveInvoice: (input: InvoiceInput, id?: string) => ActionResult;
+  issueInvoice: (id: string) => ActionResult;
+  recordInvoicePayment: (id: string, input: InvoicePaymentInput) => ActionResult;
+  voidInvoice: (id: string) => ActionResult;
+  deleteInvoice: (id: string) => ActionResult;
   createAsset: (input: AssetInput) => ActionResult;
   deleteAsset: (id: string) => ActionResult;
   chargeAssetDepreciation: (id: string, asOfDate?: string) => ActionResult;
@@ -256,11 +295,13 @@ function snapshot(state: AppState): AppData {
     inventory: state.inventory,
     transactions: state.transactions,
     customers: state.customers ?? [],
+    suppliers: state.suppliers ?? [],
     orders: state.orders,
     accounts: state.accounts,
     journalEntries: state.journalEntries,
     purchases: state.purchases,
     expenses: state.expenses ?? [],
+    invoices: state.invoices ?? [],
     assets: state.assets ?? [],
     employees: state.employees ?? [],
     holidays: state.holidays ?? [],
@@ -282,6 +323,27 @@ function customerFrom(input: CustomerInput, existing?: Customer): { customer: Cu
       id: existing?.id ?? createId(),
       name: input.name.trim(),
       phone,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    },
+  };
+}
+
+function saveSupplier(suppliers: Supplier[], input: SupplierInput, id?: string): { supplier: Supplier } | { error: string } {
+  const name = input.name.trim();
+  if (!name) return { error: "Supplier name is required." };
+  const taken = suppliers.some(
+    (supplier) => supplier.id !== id && supplier.name.trim().toLowerCase() === name.toLowerCase()
+  );
+  if (taken) return { error: "A supplier with this name already exists." };
+  const now = nowIso();
+  const existing = id ? suppliers.find((supplier) => supplier.id === id) : undefined;
+  return {
+    supplier: {
+      id: existing?.id ?? createId(),
+      name,
+      phone: input.phone.trim(),
+      email: input.email.trim(),
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     },
@@ -1016,6 +1078,46 @@ export const useAppStore = create<AppState>((set, get) => ({
     set(next);
     return { ok: true };
   },
+  createSupplier: (input) => {
+    const state = get();
+    const saved = saveSupplier(state.suppliers, input);
+    if ("error" in saved) return { ok: false, error: saved.error };
+    const next = { ...snapshot(state), suppliers: [saved.supplier, ...state.suppliers] };
+    persist(next);
+    set(next);
+    return { ok: true, id: saved.supplier.id };
+  },
+  updateSupplier: (id, input) => {
+    const state = get();
+    if (!state.suppliers.some((supplier) => supplier.id === id)) {
+      return { ok: false, error: "Supplier not found." };
+    }
+    const saved = saveSupplier(state.suppliers, input, id);
+    if ("error" in saved) return { ok: false, error: saved.error };
+    const next = {
+      ...snapshot(state),
+      suppliers: state.suppliers.map((supplier) => (supplier.id === id ? saved.supplier : supplier)),
+      purchases: state.purchases.map((purchase) =>
+        purchase.supplierId === id ? { ...purchase, supplier: saved.supplier.name } : purchase
+      ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  deleteSupplier: (id) => {
+    const state = get();
+    if (state.purchases.some((purchase) => purchase.supplierId === id)) {
+      return { ok: false, error: "This supplier cannot be deleted because they are on a purchase." };
+    }
+    const next = {
+      ...snapshot(state),
+      suppliers: state.suppliers.filter((supplier) => supplier.id !== id),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
   createOrder: (input) => {
     const state = get();
     const table = state.tables.find((row) => row.id === input.tableId);
@@ -1219,7 +1321,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   createPurchase: (input) => {
     const state = get();
-    if (!input.supplier.trim()) return { ok: false, error: "Supplier is required." };
+    const supplier = state.suppliers.find((row) => row.id === input.supplierId);
+    if (!supplier) return { ok: false, error: "Select a supplier." };
     if (!input.date) return { ok: false, error: "Date is required." };
     if (!input.lines.length) return { ok: false, error: "Add at least one purchase line." };
     if (input.lines.some((line) => !line.description.trim() || line.quantity <= 0 || line.unitCost < 0)) {
@@ -1247,7 +1350,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         "PUR",
         state.purchases.map((row) => row.number)
       ),
-      supplier: input.supplier.trim(),
+      supplierId: supplier.id,
+      supplier: supplier.name,
       invoiceNumber: input.invoiceNumber.trim(),
       date: input.date,
       payment: input.payment,
@@ -1411,6 +1515,166 @@ export const useAppStore = create<AppState>((set, get) => ({
       journalEntries: state.journalEntries.filter(
         (entry) => entry.id !== expense.journalEntryId && entry.sourceId !== id
       ),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  saveInvoice: (input, id) => {
+    const state = get();
+    const existing = id ? state.invoices.find((row) => row.id === id) : undefined;
+    if (id && !existing) return { ok: false, error: "Invoice not found." };
+    if (existing && existing.status !== "draft") {
+      return { ok: false, error: "Only a draft invoice can be edited." };
+    }
+    const prepared = prepareInvoice(state, input, existing);
+    if ("error" in prepared) return { ok: false, error: prepared.error };
+    let invoice = prepared.invoice;
+    let journals = state.journalEntries;
+    if (input.issue) {
+      const posted = postInvoice(state.accounts, journals, invoice);
+      if ("error" in posted) return { ok: false, error: posted.error };
+      invoice = posted.invoice;
+      journals = [posted.journal, ...journals];
+    }
+    const next = {
+      ...snapshot(state),
+      customers: prepared.customers,
+      invoices: existing
+        ? state.invoices.map((row) => (row.id === invoice.id ? invoice : row))
+        : [invoice, ...state.invoices],
+      journalEntries: journals,
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: invoice.id };
+  },
+  issueInvoice: (id) => {
+    const state = get();
+    const invoice = state.invoices.find((row) => row.id === id);
+    if (!invoice) return { ok: false, error: "Invoice not found." };
+    if (invoice.status !== "draft") return { ok: false, error: "Only a draft invoice can be issued." };
+    const posted = postInvoice(state.accounts, state.journalEntries, invoice);
+    if ("error" in posted) return { ok: false, error: posted.error };
+    const next = {
+      ...snapshot(state),
+      invoices: state.invoices.map((row) => (row.id === id ? posted.invoice : row)),
+      journalEntries: [posted.journal, ...state.journalEntries],
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id };
+  },
+  recordInvoicePayment: (id, input) => {
+    const state = get();
+    const invoice = state.invoices.find((row) => row.id === id);
+    if (!invoice) return { ok: false, error: "Invoice not found." };
+    if (invoice.status !== "issued" && invoice.status !== "partial") {
+      return { ok: false, error: "Record a payment on an issued invoice that still has a balance." };
+    }
+    if (!input.date) return { ok: false, error: "Payment date is required." };
+    const amount = money(input.amount);
+    if (amount <= 0) return { ok: false, error: "Amount must be greater than zero." };
+    const totals = invoiceTotals(invoice);
+    if (amount - totals.balance > 0.009) {
+      return { ok: false, error: "Amount is more than the balance due." };
+    }
+    const cashAccount =
+      input.method === "cash"
+        ? accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.cash)
+        : accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.bank);
+    const receivable = accountByCode(state.accounts, SYSTEM_ACCOUNT_CODES.receivable);
+    if (!cashAccount || !receivable) {
+      return { ok: false, error: "Cash, bank or accounts receivable is missing from the chart of accounts." };
+    }
+    const journalId = createId();
+    const payment: InvoicePayment = {
+      id: createId(),
+      date: input.date,
+      amount,
+      method: input.method,
+      reference: input.reference.trim(),
+      journalEntryId: journalId,
+    };
+    const journal: JournalEntry = {
+      id: journalId,
+      number: nextDocumentNumber(
+        "JNL",
+        state.journalEntries.map((row) => row.number)
+      ),
+      date: input.date,
+      description: `Payment ${invoice.number} ${invoice.customerName}`.trim(),
+      source: "invoice",
+      sourceId: invoice.id,
+      lines: [
+        {
+          id: createId(),
+          accountId: cashAccount.id,
+          description: invoice.customerName || invoice.number,
+          debit: amount,
+          credit: 0,
+        },
+        {
+          id: createId(),
+          accountId: receivable.id,
+          description: invoice.number,
+          debit: 0,
+          credit: amount,
+        },
+      ],
+      createdAt: nowIso(),
+    };
+    const journalError = validateJournalLines(journal.lines);
+    if (journalError) return { ok: false, error: journalError };
+    const payments = [...invoice.payments, payment];
+    const paid = invoiceTotals({ ...invoice, payments });
+    const updated: Invoice = {
+      ...invoice,
+      payments,
+      status: paid.balance <= 0.009 ? "paid" : "partial",
+      updatedAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      invoices: state.invoices.map((row) => (row.id === id ? updated : row)),
+      journalEntries: [journal, ...state.journalEntries],
+    };
+    persist(next);
+    set(next);
+    return { ok: true, id: payment.id };
+  },
+  voidInvoice: (id) => {
+    const state = get();
+    const invoice = state.invoices.find((row) => row.id === id);
+    if (!invoice) return { ok: false, error: "Invoice not found." };
+    if (invoice.status === "draft") return { ok: false, error: "Delete a draft instead of voiding it." };
+    if (invoice.status === "void") return { ok: false, error: "This invoice is already void." };
+    const drop = new Set(invoice.payments.map((payment) => payment.journalEntryId).filter(Boolean) as string[]);
+    if (invoice.journalEntryId) drop.add(invoice.journalEntryId);
+    const updated: Invoice = {
+      ...invoice,
+      status: "void",
+      journalEntryId: null,
+      payments: invoice.payments.map((payment) => ({ ...payment, journalEntryId: null })),
+      updatedAt: nowIso(),
+    };
+    const next = {
+      ...snapshot(state),
+      invoices: state.invoices.map((row) => (row.id === id ? updated : row)),
+      journalEntries: state.journalEntries.filter((entry) => entry.sourceId !== id && !drop.has(entry.id)),
+    };
+    persist(next);
+    set(next);
+    return { ok: true };
+  },
+  deleteInvoice: (id) => {
+    const state = get();
+    const invoice = state.invoices.find((row) => row.id === id);
+    if (!invoice) return { ok: false, error: "Invoice not found." };
+    if (invoice.status !== "draft") return { ok: false, error: "Only a draft invoice can be deleted." };
+    const next = {
+      ...snapshot(state),
+      invoices: state.invoices.filter((row) => row.id !== id),
     };
     persist(next);
     set(next);
@@ -2285,6 +2549,141 @@ function validateAccountInput(accounts: Account[], input: AccountInput, id?: str
   const types: AccountType[] = ["asset", "liability", "equity", "income", "expense"];
   if (!types.includes(input.type)) return "Select an account type.";
   return null;
+}
+
+function prepareInvoice(
+  state: AppState,
+  input: InvoiceInput,
+  existing?: Invoice
+): { invoice: Invoice; customers: Customer[] } | { error: string } {
+  if (!input.customerName.trim() && !input.customerId) return { error: "Customer name is required." };
+  if (!input.date) return { error: "Invoice date is required." };
+  if (!input.dueDate) return { error: "Due date is required." };
+  if (!input.lines.length) return { error: "Add at least one line." };
+  if (
+    input.lines.some(
+      (line) =>
+        !line.description.trim() ||
+        line.quantity <= 0 ||
+        line.unitPrice < 0 ||
+        (line.vatRate !== 0 && line.vatRate !== 15)
+    )
+  ) {
+    return { error: "Each line needs a description, quantity, price and a VAT rate of 0 or 15." };
+  }
+  let customers = state.customers;
+  let customerId = input.customerId;
+  let customerName = input.customerName.trim();
+  let customerPhone = input.customerPhone.trim();
+  if (customerId) {
+    const customer = customers.find((row) => row.id === customerId);
+    if (!customer) return { error: "Customer not found." };
+    customerName = customerName || customer.name;
+    customerPhone = customer.phone;
+  } else {
+    const linked = linkCustomer(customers, customerName, customerPhone);
+    if (linked.error) return { error: linked.error };
+    if (!linked.customerName) return { error: "Customer name is required." };
+    customers = linked.customers;
+    customerId = linked.customerId;
+    customerName = linked.customerName;
+    customerPhone = linked.customerPhone;
+  }
+  const now = nowIso();
+  const lines: InvoiceLine[] = input.lines.map((line) => ({
+    id: createId(),
+    description: line.description.trim(),
+    menuItemId: line.menuItemId,
+    quantity: line.quantity,
+    unitPrice: money(line.unitPrice),
+    vatRate: line.vatRate,
+  }));
+  return {
+    customers,
+    invoice: {
+      id: existing?.id ?? createId(),
+      number:
+        existing?.number ??
+        nextDocumentNumber(
+          "INV",
+          state.invoices.map((row) => row.number)
+        ),
+      customerId,
+      customerName,
+      customerPhone,
+      billTo: input.billTo.trim(),
+      date: input.date,
+      dueDate: input.dueDate,
+      status: "draft",
+      notes: input.notes.trim(),
+      lines,
+      payments: [],
+      journalEntryId: null,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    },
+  };
+}
+
+function postInvoice(
+  accounts: Account[],
+  journals: JournalEntry[],
+  invoice: Invoice
+): { invoice: Invoice; journal: JournalEntry } | { error: string } {
+  const receivable = accountByCode(accounts, SYSTEM_ACCOUNT_CODES.receivable);
+  const sales = accountByCode(accounts, SYSTEM_ACCOUNT_CODES.sales);
+  const vatAccount = accountByCode(accounts, SYSTEM_ACCOUNT_CODES.vatPayable);
+  if (!receivable || !sales || !vatAccount) {
+    return { error: "Accounts receivable, sales or VAT payable is missing from the chart of accounts." };
+  }
+  const totals = invoiceTotals(invoice);
+  if (totals.gross <= 0) return { error: "Invoice total must be greater than zero." };
+  const lines: JournalLine[] = [
+    {
+      id: createId(),
+      accountId: receivable.id,
+      description: invoice.customerName || invoice.number,
+      debit: totals.gross,
+      credit: 0,
+    },
+  ];
+  if (totals.net > 0) {
+    lines.push({
+      id: createId(),
+      accountId: sales.id,
+      description: "Sales",
+      debit: 0,
+      credit: totals.net,
+    });
+  }
+  if (totals.vat > 0) {
+    lines.push({
+      id: createId(),
+      accountId: vatAccount.id,
+      description: "VAT",
+      debit: 0,
+      credit: totals.vat,
+    });
+  }
+  const error = validateJournalLines(lines);
+  if (error) return { error };
+  const journalId = createId();
+  return {
+    invoice: { ...invoice, status: "issued", journalEntryId: journalId, updatedAt: nowIso() },
+    journal: {
+      id: journalId,
+      number: nextDocumentNumber(
+        "JNL",
+        journals.map((row) => row.number)
+      ),
+      date: invoice.date,
+      description: `Invoice ${invoice.number} ${invoice.customerName}`.trim(),
+      source: "invoice",
+      sourceId: invoice.id,
+      lines,
+      createdAt: nowIso(),
+    },
+  };
 }
 
 function creditAccountForPayment(accounts: Account[], payment: PurchasePayment | AssetFunding) {

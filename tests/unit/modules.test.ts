@@ -718,8 +718,9 @@ describe("defects against the module rules", () => {
       unitId,
       isActive: true,
     });
+    const supplier = useAppStore.getState().createSupplier({ name: "QA Supplier", phone: "", email: "" });
     const result = useAppStore.getState().createPurchase({
-      supplier: "QA Supplier",
+      supplierId: mustId(supplier),
       invoiceNumber: "QA-1",
       date: "2026-11-01",
       payment: "cash",
@@ -753,8 +754,9 @@ describe("defects against the module rules", () => {
     });
     if (!existing) throw new Error("seed inventory missing chicken");
     const before = existing.currentStock;
+    const supplier = useAppStore.getState().createSupplier({ name: "QA Supplier", phone: "", email: "" });
     const result = useAppStore.getState().createPurchase({
-      supplier: "QA Supplier",
+      supplierId: mustId(supplier),
       invoiceNumber: "QA-2",
       date: "2026-11-01",
       payment: "cash",
@@ -794,6 +796,41 @@ describe("defects against the module rules", () => {
       costPerUnit: 1,
     });
     expect(() => useAppStore.getState().addStock(mustId(record), 1, "Count", "not-a-date")).not.toThrow();
+  });
+
+  it("issues an invoice, takes a part payment, and voids the posting", () => {
+    const seeded = createSeedData();
+    useAppStore.setState({ ...seeded, invoices: [], hydrated: true });
+    const draft = useAppStore.getState().saveInvoice({
+      customerId: null,
+      customerName: "Harbour Events",
+      customerPhone: "",
+      billTo: "Grand Baie",
+      date: "2026-11-01",
+      dueDate: "2026-11-15",
+      notes: "",
+      issue: false,
+      lines: [{ description: "Private dinner", menuItemId: null, quantity: 2, unitPrice: 1000, vatRate: 15 }],
+    });
+    const id = mustId(draft);
+    expect(useAppStore.getState().invoices.find((row) => row.id === id)?.status).toBe("draft");
+    expect(useAppStore.getState().issueInvoice(id).ok).toBe(true);
+    const issued = useAppStore.getState().invoices.find((row) => row.id === id);
+    expect(issued?.status).toBe("issued");
+    expect(issued?.journalEntryId).toBeTruthy();
+    const part = useAppStore.getState().recordInvoicePayment(id, {
+      date: "2026-11-02",
+      amount: 500,
+      method: "bank",
+      reference: "TRF-1",
+    });
+    expect(part.ok).toBe(true);
+    expect(useAppStore.getState().invoices.find((row) => row.id === id)?.status).toBe("partial");
+    expect(useAppStore.getState().voidInvoice(id).ok).toBe(true);
+    const voided = useAppStore.getState().invoices.find((row) => row.id === id);
+    expect(voided?.status).toBe("void");
+    expect(useAppStore.getState().journalEntries.some((entry) => entry.sourceId === id)).toBe(false);
+    expect(useAppStore.getState().deleteInvoice(id).ok).toBe(false);
   });
 
   it("does not restore deleted holidays or units the next time data is loaded", () => {

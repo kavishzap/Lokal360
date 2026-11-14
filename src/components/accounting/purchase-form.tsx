@@ -2,10 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { SupplierForm } from "@/components/accounting/supplier-form";
 import { Field, FormModal } from "@/components/shared/form-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +19,14 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useTranslate } from "@/i18n/use-translate";
 import { lineAmount, purchaseTotal } from "@/lib/accounting";
 import { formatMUR } from "@/lib/format";
 import { unitAbbreviation } from "@/lib/units";
 import { useAppStore } from "@/store/app-store";
 
 const schema = z.object({
-  supplier: z.string().min(1, "Supplier is required"),
+  supplierId: z.string().min(1, "Select a supplier"),
   invoiceNumber: z.string().optional(),
   date: z.string().min(1, "Date is required"),
   payment: z.enum(["cash", "bank", "credit"]),
@@ -71,13 +73,16 @@ function PurchaseFormInner({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslate();
+  const [supplierOpen, setSupplierOpen] = useState(false);
   const ingredients = useAppStore((state) => state.ingredients);
   const units = useAppStore((state) => state.units);
+  const suppliers = useAppStore((state) => state.suppliers);
   const createPurchase = useAppStore((state) => state.createPurchase);
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
-      supplier: "",
+      supplierId: "",
       invoiceNumber: "",
       date: new Date().toISOString().slice(0, 10),
       payment: "credit",
@@ -92,7 +97,7 @@ function PurchaseFormInner({
   useEffect(() => {
     if (!open) return;
     form.reset({
-      supplier: "",
+      supplierId: "",
       invoiceNumber: "",
       date: new Date().toISOString().slice(0, 10),
       payment: "credit",
@@ -103,7 +108,7 @@ function PurchaseFormInner({
 
   const onSubmit = (values: Values) => {
     const result = createPurchase({
-      supplier: values.supplier,
+      supplierId: values.supplierId,
       invoiceNumber: values.invoiceNumber ?? "",
       date: values.date,
       payment: values.payment,
@@ -120,6 +125,7 @@ function PurchaseFormInner({
   };
 
   return (
+    <>
     <FormModal
       open={open}
       onOpenChange={onOpenChange}
@@ -129,8 +135,39 @@ function PurchaseFormInner({
     >
       <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Supplier" error={form.formState.errors.supplier?.message}>
-            <Input {...form.register("supplier")} placeholder="Island Foods Ltd" />
+          <Field label="Supplier" error={form.formState.errors.supplierId?.message}>
+            <div className="flex gap-2">
+              <Controller
+                control={form.control}
+                name="supplierId"
+                render={({ field }) => (
+                  <Select value={field.value || null} onValueChange={field.onChange}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder={t("Select a supplier")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[...suppliers]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((supplier) => (
+                          <SelectItem key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-lg"
+                className="shrink-0"
+                aria-label={t("Add supplier")}
+                onClick={() => setSupplierOpen(true)}
+              >
+                <Plus />
+              </Button>
+            </div>
           </Field>
           <Field label="Invoice no.">
             <Input {...form.register("invoiceNumber")} placeholder="INV-4421" />
@@ -290,5 +327,11 @@ function PurchaseFormInner({
         </div>
       </form>
     </FormModal>
+    <SupplierForm
+      open={supplierOpen}
+      onOpenChange={setSupplierOpen}
+      onCreated={(id) => form.setValue("supplierId", id, { shouldValidate: true })}
+    />
+    </>
   );
 }

@@ -52,11 +52,13 @@ export function emptyData(): AppData {
     inventory: [],
     transactions: [],
     customers: [],
+    suppliers: [],
     orders: [],
     accounts: [],
     journalEntries: [],
     purchases: [],
     expenses: [],
+    invoices: [],
     assets: [],
     employees: [],
     holidays: [],
@@ -115,6 +117,7 @@ function migrate(parsed: Partial<AppData> & { ingredients?: LegacyIngredient[] }
     inventory: parsed.inventory ?? [],
     transactions: parsed.transactions ?? [],
     customers: parsed.customers ?? [],
+    suppliers: parsed.suppliers ?? [],
     orders: (parsed.orders ?? createSampleOrders(parsed.tables ?? [], parsed.menuItems ?? [])).map(
       (order) => ({
         ...order,
@@ -127,8 +130,12 @@ function migrate(parsed: Partial<AppData> & { ingredients?: LegacyIngredient[] }
       parsed.accounts?.length ? parsed.accounts : accounting.accounts
     ),
     journalEntries: parsed.journalEntries ?? accounting.journalEntries,
-    purchases: parsed.purchases ?? accounting.purchases,
+    purchases: (parsed.purchases ?? accounting.purchases).map((purchase) => ({
+      ...purchase,
+      supplierId: purchase.supplierId ?? null,
+    })),
     expenses: parsed.expenses ?? accounting.expenses,
+    invoices: parsed.invoices ?? [],
     assets: parsed.assets ?? accounting.assets,
     holidays: parsed.holidays?.length ? parsed.holidays : makeHolidays(),
     leaveRequests: parsed.leaveRequests ?? payroll.leaveRequests,

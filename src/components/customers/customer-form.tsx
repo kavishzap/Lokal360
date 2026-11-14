@@ -22,10 +22,12 @@ export function CustomerForm({
   open,
   onOpenChange,
   customer,
+  onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customer?: Customer | null;
+  onCreated?: (id: string) => void;
 }) {
   const createCustomer = useAppStore((state) => state.createCustomer);
   const updateCustomer = useAppStore((state) => state.updateCustomer);
@@ -47,6 +49,7 @@ export function CustomerForm({
       return;
     }
     toast.success(customer ? "Customer updated" : "Customer created");
+    if (!customer && result.id) onCreated?.(result.id);
     onOpenChange(false);
   };
 

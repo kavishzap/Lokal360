@@ -18,6 +18,7 @@ export const SYSTEM_ACCOUNT_CODES = {
   cash: "1000",
   bank: "1010",
   inventory: "1100",
+  receivable: "1300",
   fixedAssets: "1200",
   accumDep: "1205",
   payable: "2000",
@@ -27,6 +28,7 @@ export const SYSTEM_ACCOUNT_CODES = {
   nsfPayable: "2130",
   hrdcPayable: "2140",
   prgfPayable: "2150",
+  vatPayable: "2200",
   capital: "3000",
   sales: "4000",
   purchases: "5000",
@@ -57,6 +59,36 @@ export function purchaseTotal(purchase: { lines: { quantity: number; unitCost: n
 
 export function expenseTotal(expense: { lines: { amount: number }[] }) {
   return Number(expense.lines.reduce((sum, line) => sum + (Number(line.amount) || 0), 0).toFixed(2));
+}
+
+export function money(value: number) {
+  const amount = Number.isFinite(value) ? value : 0;
+  return Number(amount.toFixed(2));
+}
+
+export function invoiceLineNet(line: { quantity: number; unitPrice: number }) {
+  return money(line.quantity * line.unitPrice);
+}
+
+export function invoiceLineVat(line: { quantity: number; unitPrice: number; vatRate: number }) {
+  return money(invoiceLineNet(line) * ((Number(line.vatRate) || 0) / 100));
+}
+
+export function invoiceTotals(invoice: {
+  lines: { quantity: number; unitPrice: number; vatRate: number }[];
+  payments?: { amount: number }[];
+}) {
+  const net = money(invoice.lines.reduce((sum, line) => sum + invoiceLineNet(line), 0));
+  const vat = money(invoice.lines.reduce((sum, line) => sum + invoiceLineVat(line), 0));
+  const gross = money(net + vat);
+  const paid = money((invoice.payments ?? []).reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0));
+  return {
+    net,
+    vat,
+    gross,
+    paid,
+    balance: money(Math.max(0, gross - paid)),
+  };
 }
 
 export function journalTotals(lines: Pick<JournalLine, "debit" | "credit">[]) {

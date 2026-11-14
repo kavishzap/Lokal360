@@ -15,6 +15,9 @@ const GUEST_PATHS = [
   "/dashboard/orders",
   "/dashboard/inventory",
   "/dashboard/balance-inventory",
+  "/dashboard/invoices",
+  "/dashboard/invoices/new",
+  "/dashboard/suppliers",
   "/dashboard/purchases",
   "/dashboard/expenses",
   "/dashboard/assets",
@@ -448,7 +451,7 @@ test("switches the ledger and the cashbook to the bank", async ({ page }) => {
 
 test("switches the sales report to last year and to the accountant view", async ({ page }) => {
   await login(page);
-  await openSection(page, "Reports");
+  await openSection(page, "Accounting");
   await page.getByRole("link", { name: "Sales report", exact: true }).click();
   await page.getByRole("combobox", { name: "Period" }).click();
   await page.getByRole("option", { name: "Last year" }).click();
@@ -469,7 +472,7 @@ test("puts the company BRN on the sales report", async ({ page }) => {
   await page.getByRole("button", { name: "Save company" }).click();
   await expect(page.getByText("Company details saved")).toBeVisible();
 
-  await openSection(page, "Reports");
+  await openSection(page, "Accounting");
   await page.getByRole("link", { name: "Sales report", exact: true }).click();
   await expect(page.getByText("BRN C99999999")).toBeVisible();
 });

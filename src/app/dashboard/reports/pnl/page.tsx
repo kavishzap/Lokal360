@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { ReportShell } from "@/components/reports/report-shell";
 import { useReportQuery } from "@/hooks/use-report-query";
-import { expenseTotal, purchaseTotal } from "@/lib/accounting";
+import { expenseTotal, invoiceTotals, purchaseTotal } from "@/lib/accounting";
 import { formatMUR } from "@/lib/format";
 import { orderTotal } from "@/lib/orders";
 import { inDateRange, percent } from "@/lib/reports";
@@ -11,6 +11,7 @@ import { useAppStore } from "@/store/app-store";
 
 export default function PnlReportPage() {
   const orders = useAppStore((state) => state.orders);
+  const invoices = useAppStore((state) => state.invoices);
   const purchases = useAppStore((state) => state.purchases ?? []);
   const expenses = useAppStore((state) => state.expenses ?? []);
   const journals = useAppStore((state) => state.journalEntries);
@@ -18,9 +19,18 @@ export default function PnlReportPage() {
   const query = useReportQuery();
 
   const figures = useMemo(() => {
-    const sales = orders
-      .filter((order) => order.status !== "cancelled" && inDateRange(order.createdAt, query.from, query.to))
-      .reduce((sum, order) => sum + orderTotal(order), 0);
+    const sales =
+      orders
+        .filter((order) => order.status !== "cancelled" && inDateRange(order.createdAt, query.from, query.to))
+        .reduce((sum, order) => sum + orderTotal(order), 0) +
+      invoices
+        .filter(
+          (invoice) =>
+            invoice.status !== "draft" &&
+            invoice.status !== "void" &&
+            inDateRange(invoice.date, query.from, query.to)
+        )
+        .reduce((sum, invoice) => sum + invoiceTotals(invoice).net, 0);
     const cogs = purchases
       .filter((purchase) => inDateRange(purchase.date, query.from, query.to))
       .reduce((sum, purchase) => sum + purchaseTotal(purchase), 0);
@@ -46,7 +56,7 @@ export default function PnlReportPage() {
     const gross = sales - cogs;
     const net = gross - opex - wages - depreciation;
     return { sales, cogs, opex, wages, depreciation, gross, net };
-  }, [orders, purchases, expenses, journals, accounts, query.from, query.to]);
+  }, [orders, invoices, purchases, expenses, journals, accounts, query.from, query.to]);
 
   const ownerView = query.audience === "owner";
   const margin = percent(figures.net, figures.sales);

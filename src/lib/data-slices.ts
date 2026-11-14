@@ -11,11 +11,13 @@ export const DATA_SLICES = [
   "inventory",
   "movements",
   "customers",
+  "suppliers",
   "orders",
   "accounts",
   "journals",
   "purchases",
   "expenses",
+  "invoices",
   "assets",
   "employees",
   "leave",
@@ -46,8 +48,12 @@ function routeSlices(pathname: string): DataSlice[] {
   if (under(pathname, "/dashboard/balance-inventory")) {
     return ["company", "orders", "menu", "ingredients", "inventory", "movements", "units"];
   }
+  if (under(pathname, "/dashboard/invoices")) {
+    return ["company", "invoices", "customers", "menu", "accounts", "journals"];
+  }
+  if (under(pathname, "/dashboard/suppliers")) return ["company", "suppliers", "purchases"];
   if (under(pathname, "/dashboard/purchases")) {
-    return ["company", "purchases", "ingredients", "units", "accounts", "journals", "inventory", "movements"];
+    return ["company", "purchases", "suppliers", "ingredients", "units", "accounts", "journals", "inventory", "movements"];
   }
   if (under(pathname, "/dashboard/expenses")) return ["company", "expenses", "accounts", "journals"];
   if (under(pathname, "/dashboard/assets")) return ["company", "assets", "accounts", "journals", "inventory"];
@@ -57,7 +63,7 @@ function routeSlices(pathname: string): DataSlice[] {
   if (under(pathname, "/dashboard/cashbook")) return ["company", "journals", "accounts"];
   if (under(pathname, "/dashboard/reports/expenses")) return ["company", "expenses", "accounts"];
   if (under(pathname, "/dashboard/reports/sales")) return ["company", "orders", "tables", "zones", "categories"];
-  if (under(pathname, "/dashboard/reports/pnl")) return ["company", "orders", "journals", "accounts"];
+  if (under(pathname, "/dashboard/reports/pnl")) return ["company", "orders", "invoices", "journals", "accounts"];
   if (under(pathname, "/dashboard/payroll/employees")) return ["company", "employees"];
   if (under(pathname, "/dashboard/payroll/leave")) return ["company", "employees", "leave", "policy"];
   if (under(pathname, "/dashboard/payroll/attendance")) return ["company", "employees", "attendance", "holidays"];
@@ -83,7 +89,7 @@ function routeSlices(pathname: string): DataSlice[] {
   if (under(pathname, "/dashboard/me")) {
     return ["company", "policy", "holidays", "employees", "leave", "attendance", "payslips"];
   }
-  if (pathname === "/dashboard") return ["company", "orders", "purchases", "expenses", "journals", "accounts"];
+  if (pathname === "/dashboard") return ["company", "orders", "invoices", "purchases", "expenses", "journals", "accounts"];
   return ["company"];
 }
 

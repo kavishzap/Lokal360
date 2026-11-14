@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { useTranslate } from "@/i18n/use-translate";
-import { APP_NAME, DEMO_CREDENTIALS, STAFF_PASSWORD } from "@/lib/constants";
+import { DEMO_CREDENTIALS, STAFF_PASSWORD } from "@/lib/constants";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -103,6 +103,11 @@ export default function LoginPage() {
           @media (prefers-reduced-motion: reduce) {
             .login-shift { transform: none; transition: none; }
           }
+          .login-dots {
+            background-color: #f8fafc;
+            background-image: radial-gradient(rgba(15, 23, 42, 0.18) 1.15px, transparent 1.15px);
+            background-size: 22px 22px;
+          }
         `}</style>
         <div className="login-spot pointer-events-none absolute inset-0" />
         <div className="login-grid pointer-events-none absolute inset-0" />
@@ -110,38 +115,40 @@ export default function LoginPage() {
         <div className="login-shift pointer-events-none absolute right-[-4rem] bottom-8 size-72 rounded-full bg-indigo-400/20 blur-3xl" style={{ "--d": -26 } as React.CSSProperties} />
         <div className="relative z-10 flex min-h-full w-full flex-col justify-between gap-10 p-10 xl:p-16">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 font-semibold">
-              B42
-            </div>
+            <img
+              src="/Lokal360%20POS%20Terminal%20Logo.png"
+              alt="Lokal 360"
+              className="h-9 w-auto brightness-0 invert"
+            />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold">{APP_NAME}</p>
-              <p className="text-sm text-slate-400">{t("Back office")}</p>
+              <p className="font-semibold">Lokal 360</p>
+              <p className="text-sm text-slate-400">{t("Management")}</p>
             </div>
             <LanguageSwitch tone="dark" />
           </div>
           <div className="login-shift max-w-xl" style={{ "--d": -12 } as React.CSSProperties}>
             <p className="flex items-center gap-3 text-[11px] font-semibold tracking-[0.32em] text-blue-200 uppercase">
               <span className="h-px w-8 bg-blue-400" />
-              {t("Restaurant back office")}
+              {t("Management platform")}
             </p>
             <h1 className="mt-5 max-w-[12em] text-[2.65rem] font-semibold leading-[1.08] tracking-[-0.03em] text-balance text-white xl:text-5xl xl:leading-[1.05]">
-              {t("The floor, the books and the wage bill in one place.")}
+              {t("Do the work here. Connect it to anything.")}
             </h1>
             <p className="mt-6 max-w-sm text-[15px] leading-7 text-pretty text-slate-300">
               {t(
-                "Built for a Mauritian restaurant: tickets in rupees, Workers' Rights Act leave, and the figures an owner checks before service."
+                "Lokal 360 is a management app for the whole operation. Add what you need, and plug in the tools you already run."
               )}
             </p>
           </div>
           <p className="text-xs text-slate-500">
             {isSupabaseConfigured()
-              ? "One restaurant. The floor, the books and the wage bill."
+              ? t("One place to manage. Ready to connect.")
               : t("Demo authentication only. No production backend.")}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center justify-center bg-slate-50 px-6 py-12">
+      <div className="login-dots flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           <img
             src="/Lokal360%20POS%20Terminal%20Logo.png"
@@ -210,20 +217,16 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            {isSupabaseConfigured() ? (
-              <p>Sign in with the owner account you added in Supabase. The first account is the administrator.</p>
-            ) : (
-              <>
-                <p className="font-medium text-slate-800">{t("Demo credentials")}</p>
-                <p>Email: {DEMO_CREDENTIALS.email}</p>
-                <p>Password: {DEMO_CREDENTIALS.password}</p>
-                <p className="mt-2 font-medium text-slate-800">{t("Staff")}</p>
-                <p>Email: meera.ramdoyal@b42.mu</p>
-                <p>Password: {STAFF_PASSWORD}</p>
-              </>
-            )}
-          </div>
+          {isSupabaseConfigured() ? null : (
+            <div className="mt-6 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <p className="font-medium text-slate-800">{t("Demo credentials")}</p>
+              <p>Email: {DEMO_CREDENTIALS.email}</p>
+              <p>Password: {DEMO_CREDENTIALS.password}</p>
+              <p className="mt-2 font-medium text-slate-800">{t("Staff")}</p>
+              <p>Email: meera.ramdoyal@b42.mu</p>
+              <p>Password: {STAFF_PASSWORD}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

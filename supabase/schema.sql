@@ -10,6 +10,7 @@
 --   Inventory, Balance inventory  inventory_items, inventory_transactions
 --   Customers, Orders             customers, orders, order_items
 --   Purchases, Expenses, Assets   purchases, expenses, fixed_assets + their lines
+--   Invoicing                     invoices, invoice_lines, invoice_payments
 --   Chart, Journal, Ledger,       accounts, journal_entries, journal_lines
 --   Cashbook, Reports
 --   Employees, Leave, Attendance, employees, leave_requests, attendance_records
@@ -33,7 +34,7 @@ create type public.account_type as enum ('asset', 'liability', 'equity', 'income
 create type public.payment_method as enum ('cash', 'bank', 'credit');
 create type public.asset_funding as enum ('cash', 'bank', 'credit', 'capital');
 create type public.asset_category as enum ('vehicle', 'kitchen', 'furniture', 'it', 'building', 'land', 'other');
-create type public.journal_source as enum ('manual', 'purchase', 'inventory', 'expense', 'asset', 'depreciation', 'payroll');
+create type public.journal_source as enum ('manual', 'purchase', 'inventory', 'expense', 'asset', 'depreciation', 'payroll', 'invoice');
 create type public.order_status as enum ('open', 'preparing', 'served', 'completed', 'cancelled');
 create type public.stock_movement as enum ('IN', 'OUT', 'ADJUSTMENT');
 create type public.app_role as enum ('administrator', 'staff');
@@ -371,9 +372,21 @@ create index journal_lines_entry_idx on public.journal_lines (journal_entry_id);
 create index journal_lines_account_idx on public.journal_lines (account_id);
 create index journal_entries_date_idx on public.journal_entries (entry_date);
 
+create table public.suppliers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text not null default '',
+  email text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index suppliers_name_unique on public.suppliers (lower(btrim(name)));
+
 create table public.purchases (
   id uuid primary key default gen_random_uuid(),
   number text not null unique,
+  supplier_id uuid references public.suppliers (id) on delete restrict,
   supplier text not null,
   invoice_number text not null default '',
   purchase_date date not null,
@@ -406,6 +419,46 @@ create table public.expenses (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table public.invoices (
+  id uuid primary key default gen_random_uuid(),
+  number text not null unique,
+  customer_id uuid references public.customers (id) on delete set null,
+  customer_name text not null default '',
+  customer_phone text not null default '',
+  bill_to text not null default '',
+  invoice_date date not null,
+  due_date date not null,
+  status text not null default 'draft' check (status in ('draft', 'issued', 'partial', 'paid', 'void')),
+  notes text not null default '',
+  journal_entry_id uuid references public.journal_entries (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table public.invoice_lines (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices (id) on delete cascade,
+  description text not null default '',
+  menu_item_id uuid references public.menu_items (id) on delete set null,
+  quantity numeric(14,3) not null check (quantity > 0),
+  unit_price numeric(14,2) not null check (unit_price >= 0),
+  vat_rate numeric(5,2) not null default 15 check (vat_rate >= 0)
+);
+
+create table public.invoice_payments (
+  id uuid primary key default gen_random_uuid(),
+  invoice_id uuid not null references public.invoices (id) on delete cascade,
+  paid_on date not null,
+  amount numeric(14,2) not null check (amount > 0),
+  method text not null check (method in ('cash', 'bank')),
+  reference text not null default '',
+  journal_entry_id uuid references public.journal_entries (id) on delete set null
+);
+
+create index invoices_date_idx on public.invoices (invoice_date);
+create index invoice_lines_invoice_idx on public.invoice_lines (invoice_id);
+create index invoice_payments_invoice_idx on public.invoice_payments (invoice_id);
 
 create table public.expense_lines (
   id uuid primary key default gen_random_uuid(),
@@ -592,7 +645,7 @@ declare
 begin
   foreach t in array array[
     'zones', 'restaurant_tables', 'menu_categories', 'measurement_units', 'ingredients',
-    'menu_items', 'customers', 'orders', 'accounts', 'purchases', 'expenses', 'fixed_assets',
+    'menu_items', 'customers', 'suppliers', 'orders', 'accounts', 'purchases', 'expenses', 'invoices', 'fixed_assets',
     'employees', 'payroll_runs', 'company', 'payroll_policy'
   ]
   loop
@@ -624,6 +677,7 @@ insert into public.accounts (code, name, type, is_cash, is_system) values
   ('1000', 'Cash on hand', 'asset', true, true),
   ('1010', 'Bank', 'asset', true, true),
   ('1100', 'Inventory', 'asset', false, true),
+  ('1300', 'Accounts receivable', 'asset', false, true),
   ('1200', 'Fixed assets', 'asset', false, true),
   ('1205', 'Accumulated depreciation', 'asset', false, true),
   ('2000', 'Accounts payable', 'liability', false, true),
@@ -633,6 +687,7 @@ insert into public.accounts (code, name, type, is_cash, is_system) values
   ('2130', 'NSF payable', 'liability', false, true),
   ('2140', 'HRDC levy payable', 'liability', false, true),
   ('2150', 'PRGF payable', 'liability', false, true),
+  ('2200', 'VAT payable', 'liability', false, true),
   ('3000', 'Owner''s capital', 'equity', false, true),
   ('4000', 'Food sales', 'income', false, true),
   ('5000', 'Food purchases', 'expense', false, true),
@@ -673,8 +728,9 @@ begin
   foreach t in array array[
     'profiles', 'company', 'payroll_policy', 'zones', 'restaurant_tables', 'menu_categories',
     'measurement_units', 'ingredients', 'menu_items', 'menu_item_ingredients', 'inventory_items',
-    'inventory_transactions', 'customers', 'orders', 'order_items', 'accounts', 'journal_entries', 'journal_lines',
-    'purchases', 'purchase_lines', 'expenses', 'expense_lines', 'fixed_assets', 'employees',
+    'inventory_transactions', 'customers', 'suppliers', 'orders', 'order_items', 'accounts', 'journal_entries', 'journal_lines',
+    'purchases', 'purchase_lines', 'expenses', 'expense_lines', 'invoices', 'invoice_lines',
+    'invoice_payments', 'fixed_assets', 'employees',
     'public_holidays', 'leave_requests', 'attendance_records', 'payslips', 'payroll_runs'
   ]
   loop

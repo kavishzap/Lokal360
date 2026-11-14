@@ -72,6 +72,8 @@ export const IDS = {
     employerNsf: id("bbbbbbbb", 20),
     hrdc: id("bbbbbbbb", 21),
     prgfExpense: id("bbbbbbbb", 22),
+    receivable: id("bbbbbbbb", 23),
+    vatPayable: id("bbbbbbbb", 24),
   },
 };
 
@@ -829,6 +831,7 @@ export function makeAccounts(): Account[] {
     { key: "cash", code: "1000", name: "Cash on hand", type: "asset", isCash: true },
     { key: "bank", code: "1010", name: "Bank", type: "asset", isCash: true },
     { key: "inventory", code: "1100", name: "Inventory", type: "asset", isCash: false },
+    { key: "receivable", code: "1300", name: "Accounts receivable", type: "asset", isCash: false },
     { key: "fixedAssets", code: "1200", name: "Fixed assets", type: "asset", isCash: false },
     { key: "accumDep", code: "1205", name: "Accumulated depreciation", type: "asset", isCash: false },
     { key: "payable", code: "2000", name: "Accounts payable", type: "liability", isCash: false },
@@ -838,6 +841,7 @@ export function makeAccounts(): Account[] {
     { key: "nsfPayable", code: "2130", name: "NSF payable", type: "liability", isCash: false },
     { key: "hrdcPayable", code: "2140", name: "HRDC levy payable", type: "liability", isCash: false },
     { key: "prgfPayable", code: "2150", name: "PRGF payable", type: "liability", isCash: false },
+    { key: "vatPayable", code: "2200", name: "VAT payable", type: "liability", isCash: false },
     { key: "capital", code: "3000", name: "Owner's capital", type: "equity", isCash: false },
     { key: "sales", code: "4000", name: "Food sales", type: "income", isCash: false },
     { key: "purchases", code: "5000", name: "Food purchases", type: "expense", isCash: false },
@@ -914,6 +918,7 @@ export function makeSampleAccounting(ingredients: Ingredient[]): {
   const purchase: Purchase = {
     id: id("eeeeeeee", 1),
     number: "PUR-1001",
+    supplierId: id("aaaabbbb", 1),
     supplier: "Island Foods Ltd",
     invoiceNumber: "INV-4421",
     date: "2026-09-18",
@@ -1146,6 +1151,16 @@ export function createSeedData(): AppData {
   const inventory = makeInventory(ingredients);
   const transactions = makeTransactions(inventory);
   const customers = makeCustomers();
+  const suppliers = [
+    {
+      id: id("aaaabbbb", 1),
+      name: "Island Foods Ltd",
+      phone: "263 1100",
+      email: "orders@islandfoods.mu",
+      createdAt: created(1),
+      updatedAt: created(1),
+    },
+  ];
   const orders = createSampleOrders(tables, menuItems, customers);
   const accounting = makeSampleAccounting(ingredients);
   const payroll = makeSamplePayroll();
@@ -1160,7 +1175,9 @@ export function createSeedData(): AppData {
     inventory,
     transactions,
     customers,
+    suppliers,
     orders,
+    invoices: [],
     ...accounting,
     ...payroll,
     company: defaultCompany(),

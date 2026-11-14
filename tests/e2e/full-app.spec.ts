@@ -41,6 +41,8 @@ test("opens every back-office page from the sidebar", async ({ page }) => {
   await expectPage(page, "Balance Inventory", "/dashboard/balance-inventory", "Balance inventory");
 
   await openSection(page, "Accounting");
+  await expectPage(page, "Invoicing", "/dashboard/invoices", "Invoicing");
+  await expectPage(page, "Suppliers", "/dashboard/suppliers", "Suppliers");
   await expectPage(page, "Purchases", "/dashboard/purchases", "Purchases");
   await expectPage(page, "Expenses", "/dashboard/expenses", "Expenses");
   await expectPage(page, "Assets", "/dashboard/assets", "Assets");
@@ -49,7 +51,7 @@ test("opens every back-office page from the sidebar", async ({ page }) => {
   await expectPage(page, "Ledger", "/dashboard/ledger", "Ledger");
   await expectPage(page, "Cashbook", "/dashboard/cashbook", "Cashbook");
 
-  await openSection(page, "Reports");
+  await openSection(page, "Accounting");
   await expectPage(page, "Expense report", "/dashboard/reports/expenses", "Expense report");
   await expectPage(page, "Sales report", "/dashboard/reports/sales", "Sales report");
   await expectPage(page, "P&L", "/dashboard/reports/pnl", "Profit and loss");

@@ -8,6 +8,7 @@ import {
   accountBalance,
   accountByCode,
   expenseTotal,
+  invoiceTotals,
   purchaseTotal,
 } from "@/lib/accounting";
 import { useTranslate } from "@/i18n/use-translate";
@@ -33,6 +34,7 @@ export default function DashboardPage() {
   const session = useAuthStore((state) => state.session);
   const { locale, t } = useTranslate();
   const orders = useAppStore((state) => state.orders);
+  const invoices = useAppStore((state) => state.invoices);
   const purchases = useAppStore((state) => state.purchases);
   const expenses = useAppStore((state) => state.expenses);
   const journals = useAppStore((state) => state.journalEntries);
@@ -58,9 +60,16 @@ export default function DashboardPage() {
   };
 
   const movement = (from: string, to: string) => {
-    const sales = orders
-      .filter((order) => order.status !== "cancelled" && inDateRange(order.createdAt, from, to))
-      .reduce((sum, order) => sum + orderTotal(order), 0);
+    const sales =
+      orders
+        .filter((order) => order.status !== "cancelled" && inDateRange(order.createdAt, from, to))
+        .reduce((sum, order) => sum + orderTotal(order), 0) +
+      invoices
+        .filter(
+          (invoice) =>
+            invoice.status !== "draft" && invoice.status !== "void" && inDateRange(invoice.date, from, to)
+        )
+        .reduce((sum, invoice) => sum + invoiceTotals(invoice).net, 0);
     const food = purchases
       .filter((purchase) => inDateRange(purchase.date, from, to))
       .reduce((sum, purchase) => sum + purchaseTotal(purchase), 0);

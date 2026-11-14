@@ -10,7 +10,7 @@ import {
   ClipboardList,
   Contact,
   Clock,
-  FileBarChart,
+  FileText,
   Landmark,
   LayoutDashboard,
   Leaf,
@@ -22,6 +22,7 @@ import {
   Scale,
   Settings,
   ShoppingBasket,
+  Store,
   Sparkles,
   Tags,
   TrendingUp,
@@ -79,6 +80,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Accounting",
     icon: Landmark,
     children: [
+      { href: "/dashboard/invoices", label: "Invoicing", icon: FileText },
+      { href: "/dashboard/suppliers", label: "Suppliers", icon: Store },
       { href: "/dashboard/purchases", label: "Purchases", icon: Truck },
       { href: "/dashboard/expenses", label: "Expenses", icon: Receipt },
       { href: "/dashboard/assets", label: "Assets", icon: Car },
@@ -86,13 +89,6 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: "/dashboard/journal", label: "Journal Book", icon: NotebookPen },
       { href: "/dashboard/ledger", label: "Ledger", icon: BookText },
       { href: "/dashboard/cashbook", label: "Cashbook", icon: Wallet },
-    ],
-  },
-  {
-    id: "reports",
-    label: "Reports",
-    icon: FileBarChart,
-    children: [
       { href: "/dashboard/reports/expenses", label: "Expense report", icon: Receipt },
       { href: "/dashboard/reports/sales", label: "Sales report", icon: TrendingUp },
       { href: "/dashboard/reports/pnl", label: "P&L", icon: Calculator },
@@ -206,6 +202,31 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
         { label: "Balance inventory" },
       ],
     },
+    "/dashboard/invoices": {
+      title: "Invoicing",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Accounting" },
+        { label: "Invoicing" },
+      ],
+    },
+    "/dashboard/invoices/new": {
+      title: "Create invoice",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Accounting" },
+        { label: "Invoicing", href: "/dashboard/invoices" },
+        { label: "Create invoice" },
+      ],
+    },
+    "/dashboard/suppliers": {
+      title: "Suppliers",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Accounting" },
+        { label: "Suppliers" },
+      ],
+    },
     "/dashboard/purchases": {
       title: "Purchases",
       crumbs: [
@@ -266,7 +287,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Expense report",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Reports" },
+        { label: "Accounting" },
         { label: "Expense report" },
       ],
     },
@@ -274,7 +295,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Sales report",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Reports" },
+        { label: "Accounting" },
         { label: "Sales report" },
       ],
     },
@@ -282,7 +303,7 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
       title: "Profit and loss",
       crumbs: [
         { label: "Dashboard", href: "/dashboard" },
-        { label: "Reports" },
+        { label: "Accounting" },
         { label: "P&L" },
       ],
     },
@@ -364,6 +385,17 @@ export const PAGE_META: Record<string, { title: string; crumbs: { label: string;
 export function pageMeta(pathname: string) {
   const known = PAGE_META[pathname];
   if (known) return known;
+  if (/^\/dashboard\/invoices\/[^/]+$/.test(pathname)) {
+    return {
+      title: "Edit invoice",
+      crumbs: [
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Accounting" },
+        { label: "Invoicing", href: "/dashboard/invoices" },
+        { label: "Edit invoice" },
+      ],
+    };
+  }
   if (/^\/dashboard\/payroll\/employees\/[^/]+$/.test(pathname)) {
     return {
       title: "Edit employee",

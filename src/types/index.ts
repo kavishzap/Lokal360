@@ -112,6 +112,15 @@ export interface Customer {
   updatedAt: string;
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Order {
   id: string;
   orderNumber: string;
@@ -138,7 +147,46 @@ export type JournalSource =
   | "expense"
   | "asset"
   | "depreciation"
-  | "payroll";
+  | "payroll"
+  | "invoice";
+
+export type InvoiceStatus = "draft" | "issued" | "partial" | "paid" | "void";
+
+export interface InvoiceLine {
+  id: string;
+  description: string;
+  menuItemId: string | null;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+}
+
+export interface InvoicePayment {
+  id: string;
+  date: string;
+  amount: number;
+  method: "cash" | "bank";
+  reference: string;
+  journalEntryId: string | null;
+}
+
+export interface Invoice {
+  id: string;
+  number: string;
+  customerId: string | null;
+  customerName: string;
+  customerPhone: string;
+  billTo: string;
+  date: string;
+  dueDate: string;
+  status: InvoiceStatus;
+  notes: string;
+  lines: InvoiceLine[];
+  payments: InvoicePayment[];
+  journalEntryId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export type AssetFunding = PurchasePayment | "capital";
 
@@ -194,6 +242,7 @@ export interface PurchaseLine {
 export interface Purchase {
   id: string;
   number: string;
+  supplierId: string | null;
   supplier: string;
   invoiceNumber: string;
   date: string;
@@ -418,11 +467,13 @@ export interface AppData {
   inventory: InventoryItem[];
   transactions: InventoryTransaction[];
   customers: Customer[];
+  suppliers: Supplier[];
   orders: Order[];
   accounts: Account[];
   journalEntries: JournalEntry[];
   purchases: Purchase[];
   expenses: Expense[];
+  invoices: Invoice[];
   assets: FixedAsset[];
   employees: Employee[];
   holidays: PublicHoliday[];

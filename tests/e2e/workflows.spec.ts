@@ -29,7 +29,7 @@ function field(page: Page, label: string) {
 
 test("describes the product on the sign-in page", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByText("The floor, the books and the wage bill in one place.")).toBeVisible();
+  await expect(page.getByText("Do the work here. Connect it to anything.")).toBeVisible();
   await expect(page.getByText("Zones, tables, orders, recipes and the storeroom.")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
   await expect(page.getByText("admin@restaurant.com")).toBeVisible();
@@ -232,7 +232,7 @@ test("opens the cash account in the ledger and the cashbook", async ({ page }) =
 
 test("shows this year's sales, expenses and profit", async ({ page }) => {
   await login(page);
-  await openSection(page, "Reports");
+  await openSection(page, "Accounting");
   await page.getByRole("link", { name: "Sales report", exact: true }).click();
   await expect(page.getByText("No sales in this period")).toHaveCount(0);
   await expect(page.getByText("Sales mix")).toBeVisible();

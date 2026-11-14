@@ -7,7 +7,6 @@ import { ChevronDown, Lock, LogOut, PanelLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useTranslate } from "@/i18n/use-translate";
 import { companyInitials } from "@/lib/company";
@@ -136,10 +135,10 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   return (
-    <div className="flex h-full flex-col bg-[#0F172A] text-slate-200">
+    <div className="flex h-full min-h-0 flex-col bg-[#0F172A] text-slate-200">
       <div
         className={cn(
-          "flex items-center gap-3 border-b border-white/10 px-4 py-4",
+          "flex shrink-0 items-center gap-3 border-b border-white/10 px-4 py-4",
           collapsed && "flex-col justify-center gap-3 px-2 py-3"
         )}
       >
@@ -175,8 +174,7 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </SidebarTip>
       </div>
 
-      <ScrollArea className="flex-1 px-2 py-3">
-        <nav className="space-y-1">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-2 py-3">
           {NAV_SECTIONS.map((section) => {
             if (!section.children) {
               const active = section.href ? isActivePath(pathname, section.href, section.exact) : false;
@@ -294,10 +292,9 @@ export function AppSidebar({ onNavigate }: { onNavigate?: () => void }) {
               </Collapsible>
             );
           })}
-        </nav>
-      </ScrollArea>
+      </nav>
 
-      <div className="border-t border-white/10 p-3">
+      <div className="shrink-0 border-t border-white/10 p-3">
         {!collapsed && session ? (
           <div className="mb-3 rounded-lg bg-white/5 px-3 py-2">
             <p className="truncate text-sm font-medium text-white">{session.name}</p>
